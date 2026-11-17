@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BRP Field Book</title>
+<meta name="description" content="Stormwater (NPDES) inspection field book. Works offline.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Field Book">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<style>body{margin:0}#app{padding-top:env(safe-area-inset-top,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>
+/* Layout: an iPhone-native field tool. Grouped inset lists on system gray, the phone's own type, one accent (county blue); green/red only carry Yes/No. */
+:root{
+  --bg:#F2F2F7; --cell:#FFFFFF; --cell-hi:#E5E5EA; --fill:#7676801F; --thumb:#FFFFFF;
+  --label:#000000; --label-2:#3C3C4399; --label-3:#3C3C434D; --sep:#3C3C434A;
+  --accent:#0B5CAD; --accent-soft:#0B5CAD14; --yes:#248A3D; --no:#D70015; --warn:#B25000;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease-out:cubic-bezier(0.23,1,0.32,1);
+  --ease-drawer:cubic-bezier(0.32,0.72,0,1);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#000000; --cell:#1C1C1E; --cell-hi:#2C2C2E; --fill:#7676803D; --thumb:#636366;
+  --label:#FFFFFF; --label-2:#EBEBF599; --label-3:#EBEBF54D; --sep:#54545899;
+  --accent:#4C9BF0; --accent-soft:#4C9BF01F; --yes:#30D158; --no:#FF453A; --warn:#FF9F0A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#000000; --cell:#1C1C1E; --cell-hi:#2C2C2E; --fill:#7676803D; --thumb:#636366;
+  --label:#FFFFFF; --label-2:#EBEBF599; --label-3:#EBEBF54D; --sep:#54545899;
+  --accent:#4C9BF0; --accent-soft:#4C9BF01F; --yes:#30D158; --no:#FF453A; --warn:#FF9F0A; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+html,body{background:var(--bg);color:var(--label)}
+body{font-family:var(--sans);font-size:17px;line-height:1.3;letter-spacing:-.01em;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 120px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+#app{max-width:600px;margin-inline:auto}
+h1,h2,h3,p{margin:0}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;background:none;border:0;padding:0;text-align:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--mono);font-size:.9em;letter-spacing:0}
+
+/* nav bar */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;min-height:48px;background:var(--bg);margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding-inline:max(8px,env(safe-area-inset-left,0px));border-bottom:.5px solid transparent;transition:border-color 200ms ease}
+.nav.scrolled{border-bottom-color:var(--sep)}
+.nav .mid{font-weight:600;font-size:17px;max-width:52vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity 200ms ease}
+.nav.scrolled .mid{opacity:1}
+.nav .l{justify-self:start}.nav .r{justify-self:end}
+.navbtn{display:inline-flex;align-items:center;gap:2px;color:var(--accent);font-size:17px;min-height:44px;padding:0 8px;border-radius:8px;transition:opacity 120ms ease}
+.navbtn:active{opacity:.4}
+.navbtn svg{width:22px;height:22px}
+.big{font-size:34px;font-weight:700;letter-spacing:.01em;line-height:1.1;padding:4px 0 2px}
+.bigsub{color:var(--label-2);font-size:15px;padding-bottom:6px}
+
+/* grouped lists */
+.grp{margin-top:22px}
+.ghrow{display:flex;align-items:baseline;justify-content:space-between;padding-right:8px}
+.ghrow .gh{padding-bottom:7px}
+.ghbtn{color:var(--accent);font-size:15px;padding:4px 8px;min-height:32px}
+.ghbtn.on{font-weight:600}
+.minus{width:22px;height:22px;border-radius:50%;background:var(--no);color:#fff;display:grid;place-items:center;flex:none;font-weight:700;font-size:17px;line-height:1;animation:popin 220ms var(--ease-out) both}
+@keyframes popin{from{transform:scale(.4);opacity:0}}
+.confirm-row{display:grid;gap:10px;padding:12px 16px;background:color-mix(in srgb,var(--no) 8%,var(--cell))}
+.confirm-row p{font-size:15px;line-height:1.35}
+.confirm-row .acts{display:flex;gap:10px}
+.confirm-row .acts button{flex:1;text-align:center;min-height:40px;border-radius:9px;font-weight:600;font-size:15px}
+.confirm-row .del{background:var(--no);color:#fff}
+.confirm-row .keep{background:var(--fill);color:var(--label)}
+.gh{font-size:13px;font-weight:400;color:var(--label-2);text-transform:uppercase;letter-spacing:.02em;padding:0 16px 7px}
+.gf{font-size:13px;color:var(--label-2);padding:7px 16px 0;line-height:1.35}
+.cells{background:var(--cell);border-radius:10px;overflow:hidden}
+.cell{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:11px 16px;text-align:left;background:var(--cell);transition:background-color 200ms ease}
+.cell+.cell::before,.cell+.cell-x::before,.cell-x+.cell::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+button.cell:active,.cell.tap:active{background:var(--cell-hi);transition:none}
+.cell .main{flex:1;min-width:0;display:grid;gap:2px}
+.cell .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .sub{font-size:13px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .det{color:var(--label-2);white-space:nowrap}
+.cell .chev{width:14px;height:14px;color:var(--label-3);flex:none}
+.cell.accent{color:var(--accent)}
+.cell.accent svg{width:22px;height:22px}
+.cell.danger{color:var(--no);justify-content:center}
+.cell.center{justify-content:center;color:var(--accent);font-weight:600}
+.badge{min-width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:600;font-size:15px;background:var(--fill);color:var(--label-2);flex:none}
+.badge.done{background:var(--yes);color:#fff}
+.badge svg{width:16px;height:16px}
+.st-done{color:var(--yes)}.st-fix{color:var(--no)}.st-open{color:var(--label-2)}
+
+/* form rows */
+.field{display:grid;gap:3px;padding:9px 16px 10px}
+.field>span{font-size:13px;color:var(--label-2)}
+.field input,.field textarea{width:100%;border:0;background:transparent;padding:0;font-size:17px;outline:none;min-height:24px}
+.field input::placeholder,.field textarea::placeholder{color:var(--label-3)}
+.field textarea{resize:none;line-height:1.35;min-height:72px;font-size:16px}
+.field input[type=date]{min-height:28px}
+.row2{display:grid;grid-template-columns:1fr 1fr}
+.row2>.cell-x+.cell-x{border-left:.5px solid var(--sep)}
+.cell-x{position:relative;background:var(--cell)}
+
+/* segmented control with sliding thumb */
+.qrow{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:12px;align-items:center}
+.qstack{display:grid;gap:10px;padding:12px 16px}
+.qstack .ql{font-size:16px;line-height:1.3}
+.sc{position:relative;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px;background:var(--fill);border-radius:10px;padding:3px;height:40px}
+.sc .thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px - (var(--n) - 1) * 2px) / var(--n));border-radius:8px;background:var(--accent);box-shadow:0 2px 6px rgba(0,0,0,.18);transform:translateX(calc(var(--i,0) * (100% + 2px)));transition:transform 240ms var(--ease-out),background-color 200ms ease,opacity 150ms ease}
+.sc[data-v="Yes"] .thumb{background:var(--yes)}
+.sc[data-v="No"] .thumb{background:var(--no)}
+.sc[data-v="N/A"] .thumb{background:#8E8E93}
+.sc[data-v=""] .thumb{opacity:0;transition:none}
+.sc.snap .thumb{transition:opacity 150ms ease}
+.sc button{position:relative;z-index:1;text-align:center;font-size:15px;font-weight:600;color:var(--label-2);border-radius:8px;transition:color 150ms ease}
+.sc button:active{opacity:.6}
+.sc button[aria-pressed="true"]{color:#fff}
+
+/* check rows (multi or single select) */
+.check{align-items:flex-start}
+.check .txt{flex:1;min-width:0;font-size:15px;line-height:1.35}
+.check .mark{width:22px;height:22px;flex:none;color:var(--accent);opacity:0;transform:scale(.5);transition:opacity 150ms ease,transform 220ms var(--ease-out)}
+.check[aria-pressed="true"] .mark{opacity:1;transform:none}
+.check.circle .mark{opacity:1;transform:none;color:var(--label-3)}
+.check.circle[aria-pressed="true"] .mark{color:var(--accent)}
+.check .mark .on{opacity:0;transition:opacity 150ms ease}.check[aria-pressed="true"] .mark .on{opacity:1}
+.blank{background:color-mix(in srgb,var(--warn) 18%,transparent);border-radius:3px;padding:0 3px}
+.tag{font-size:13px;color:var(--accent);white-space:nowrap}
+
+/* step progress + bottom toolbar */
+.prog{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;padding:2px 0 8px}
+.prog i{height:4px;border-radius:2px;background:var(--fill);overflow:hidden;position:relative}
+.prog i::after{content:"";position:absolute;inset:0;background:var(--accent);transform-origin:0 50%;transform:scaleX(var(--p,0));transition:transform 400ms var(--ease-out)}
+.prog i.cur{background:color-mix(in srgb,var(--accent) 30%,var(--fill))}
+.toolbar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep);padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.toolbar .in{max-width:600px;margin-inline:auto;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.toolbar .pos{font-size:13px;color:var(--label-2);text-align:center}
+.pbtn{justify-self:end;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;font-weight:600;border-radius:12px;min-height:44px;padding:0 18px;transition:opacity 120ms ease,transform 120ms var(--ease-out)}
+.pbtn:active{transform:scale(.97);opacity:.85}
+.pbtn:disabled{opacity:.5}
+.pbtn svg{width:18px;height:18px}
+.wide-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--accent);color:#fff;font-weight:600;border-radius:12px;min-height:50px;margin-top:22px;transition:opacity 120ms ease,transform 120ms var(--ease-out)}
+.wide-btn:active{transform:scale(.98);opacity:.85}
+.wide-btn:disabled{opacity:.5}
+.wide-btn svg{width:20px;height:20px}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin 800ms linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* steps sheet */
+.scrim{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.32);opacity:0;transition:opacity 280ms ease}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;max-width:600px;margin-inline:auto;background:var(--bg);border-radius:14px 14px 0 0;padding:8px 16px calc(20px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform 320ms var(--ease-drawer);max-height:85dvh;overflow:auto;overscroll-behavior:contain}
+.sheet .grab{width:36px;height:5px;border-radius:3px;background:var(--label-3);margin:0 auto 10px}
+.sheet-open .scrim{opacity:1}.sheet-open .sheet{transform:none}
+.sheet h3{font-size:17px;font-weight:600;text-align:center;padding-bottom:4px}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));z-index:40;max-width:calc(100% - 48px);background:color-mix(in srgb,var(--cell) 92%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--label);padding:12px 18px;border-radius:14px;font-size:15px;font-weight:500;box-shadow:0 8px 30px rgba(0,0,0,.18);transform:translate(-50%,12px) scale(.96);opacity:0;pointer-events:none;transition:transform 300ms var(--ease-out),opacity 200ms ease}
+.toast.show{transform:translate(-50%,0) scale(1);opacity:1}
+
+/* motion */
+.push-f{animation:pushF 300ms var(--ease-out) both}
+.push-b{animation:pushB 300ms var(--ease-out) both}
+@keyframes pushF{from{opacity:0;transform:translateX(24px)}}
+@keyframes pushB{from{opacity:0;transform:translateX(-24px)}}
+.fadein{animation:fadein 220ms ease both}
+@keyframes fadein{from{opacity:0}}
+.open-down{animation:openDown 260ms var(--ease-out) both}
+@keyframes openDown{from{opacity:0;transform:translateY(-6px)}}
+.pop{animation:pop 450ms var(--ease-out) both}
+@keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+@media (hover:hover) and (pointer:fine){button.cell:hover{background:color-mix(in srgb,var(--cell-hi) 50%,var(--cell))}}
+.chk-item{align-items:flex-start}
+.chk-item .dot{width:22px;height:22px;flex:none;border-radius:50%;background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn);font-size:13px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+.chk-item.ok .dot{background:color-mix(in srgb,var(--yes) 16%,transparent);color:var(--yes)}
+.chk-item.ok .dot svg{width:14px;height:14px}
+.chk-item .main{white-space:normal}
+.chk-item .ttl{font-size:15px;line-height:1.35;white-space:normal}
+.chk-item.ok .ttl{color:var(--label-2)}
+.chk-item .where{font-size:13px;color:var(--accent);margin-top:2px}
+.chkbar{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));z-index:7;padding:0 max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));pointer-events:none}
+.chkbar .in{pointer-events:auto;max-width:600px;margin-inline:auto;background:color-mix(in srgb,var(--cell) 94%,transparent);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-radius:16px;box-shadow:0 6px 24px rgba(0,0,0,.16),0 0 0 .5px var(--sep);padding:10px 12px 10px;animation:barIn 320ms var(--ease-out) both}
+@keyframes barIn{from{opacity:0;transform:translateY(14px) scale(.98)}}
+.chkbar .top{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--label-2)}
+.chkbar .top b{color:var(--warn);font-weight:600;white-space:nowrap}
+.chkbar .top .x{margin-left:auto}
+.chkbar .note{font-size:15px;line-height:1.35;color:var(--label);margin:4px 0 8px}
+.chkbar .acts{display:grid;grid-template-columns:44px 1fr 44px;gap:8px}
+.chkbar .acts button{height:40px;border-radius:10px;background:var(--fill,color-mix(in srgb,var(--label) 8%,transparent));color:var(--accent);font-weight:600;font-size:15px;text-align:center;display:grid;place-items:center}
+.chkbar .acts button:disabled{opacity:.35}
+.chkbar .acts .good{background:var(--yes);color:#fff}
+.chkbar .acts .good.ok{background:color-mix(in srgb,var(--yes) 16%,transparent);color:var(--yes)}
+.chkbar .acts button:active{transform:scale(.97)}
+body.has-chk{padding-bottom:300px}
+body.has-chk .toast{bottom:calc(250px + env(safe-area-inset-bottom,0px))}
+.hl{position:relative;border-radius:10px;animation:hl 2.4s var(--ease-out) both}
+@keyframes hl{0%,30%{box-shadow:inset 0 0 0 2.5px var(--warn);background:color-mix(in srgb,var(--warn) 14%,var(--cell))}100%{box-shadow:inset 0 0 0 2.5px color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 6%,var(--cell))}}
+@media (prefers-reduced-motion: reduce){
+  .push-f,.push-b,.open-down,.pop{animation:fadein 150ms ease both}
+  .hl{animation:none;box-shadow:inset 0 0 0 2.5px var(--warn)}
+  .chkbar .in{animation:none}
+  .sc .thumb,.sheet{transition-duration:0ms}
+  .pbtn:active,.wide-btn:active{transform:none}
+}
+</style>
+
+</head><body>
+<div id="app" aria-live="polite"><div class="nav"><span></span><span class="mid"></span><span></span></div><h1 class="big">Field Book</h1><p class="bigsub">Loading…</p></div>
+<div id="sheetRoot"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="fill.js"></script>
+<script>
+/* ---------- form definition (mirrors the County form, in its order) ---------- */
+const CHECK=[['facilityActive','Facility Active'],['facilityPermitted','Facility Permitted'],['swpppPresent','SWPPP Present'],['recordsCurrent','Records are Current'],['samplingData','Sampling Data Evaluation'],['bmpsAcceptable','BMPs Acceptable'],['goodHousekeeping','Good Housekeeping'],['erosionPresent','Erosion Present'],['washouts','Washout(s) are Present'],['downstreamErosion','Downstream Erosion Present'],['floatable','Floatable Present'],['illicit','Illicit Discharge Present'],['nonStormwater','Non-Stormwater Discharges'],['returnRequired','Return Inspection Required'],['reportProvided','Inspection Report Provided'],['mandatory','Mandatory'],['conditional','Conditional']];
+const POLL=[['pOil','Oil & Grease'],['pBacteria','Bacteria/Virus'],['pMetals','Heavy Metals'],['pNutrients','Nutrients'],['pTrash','Trash/Debris'],['pPesticides','Pesticides'],['pSediment','Sediment'],['pOrganics','Organics']];
+const GIP=[['gSubject','Is the facility subject to CA Statewide General Industrial Permit requirements?'],['gMandCond','If Yes, is the facility Mandatory or Conditional?'],['gNec','If No, does the site have a "No Exposure Certification"?'],['gSwppp','Does the facility maintain a SWPPP?'],['gBmpsPerSwppp','Are all BMPs implemented per the SWPPP?'],['gMonitoring','Does the facility maintain a Storm Water Monitoring Plan?'],['gSamples','Were storm water samples collected last storm season?']];
+const BMPQ=[['b1','Are BMPs implemented in outdoor Storage area(s) to prevent storm water contamination?'],['b2','Are BMPs implemented in outdoor activity process areas?'],['b3','Are facility vehicle and equipment operations (washing, maintenance, etc) BMPs implemented to eliminate exposure of these activities to storm water?'],['b4','Are the contents of the waste receptacles protected from storm water contact?'],['b5','Are facility flow lines/inlets free from evidence of discharges? (Soil, landscape water, stains, etc.)'],['b6','Are spill prevention BMPs provided and control measures implemented on site?'],['b7','Are adequate erosion prevention BMPs implemented on site?']];
+const COMPLIANCE=['No violation observed/Satisfactory','Correction Issued','Verbal','Written','NOV','Cease and Desist','RWQCB Notified'];
+const PRIORITY=['High','Medium','Low','None'];
+const SIC=[['5812','Restaurant / eating place'],['5813','Bar / drinking place'],['5541','Gas station'],['7538','General auto repair'],['7532','Auto body / paint shop'],['7542','Car wash'],['7011','Hotel / motel'],['5399','General merchandise store'],['7231','Beauty / nail salon'],['2084','Winery'],['2821','Plastics materials'],['3479','Metal coating'],['3272','Concrete products'],['4214','Local trucking with storage'],['4222','Refrigerated warehousing'],['6515','Mobile home park'],['6513','Apartment complex'],['5921','Liquor store'],['5912','Drug store / pharmacy'],['5122','Cannabis dispensary / drug wholesale'],['0752','Pet boarding / grooming / kennel'],['7539','Tire / auto repair shop'],['7534','Tire retreading'],['7549','Towing / auto services'],['7521','Vehicle storage / parking'],['4212','Local trucking (no storage)'],['4911','Solar / electric power'],['1711','Plumbing / HVAC contractor'],['0181','Plant nursery'],['0711','Ag chemical / soil prep'],['5211','Lumber / hardware'],['5722','Appliance store'],['2522','Office furniture maker'],['3357','Wire & cable maker'],['7699','Repair services'],['5511','New & used car dealer'],['5411','Grocery store'],['4225','General warehousing & storage'],['5015','Auto wrecker / used parts'],['5093','Scrap & waste materials'],['4213','Trucking, except local'],['3599','Machine shop'],['2752','Commercial printing'],['1799','Special trade contractor'],['0782','Landscaping services']];
+
+/* Wording taken from 76 filed County BRP reports (2023–2026), most used first.
+   Yes / N/A lines describe what was seen; No lines are corrections. ___ marks a blank to fill. */
+const PHRASES={
+ b1:{Yes:['There are no materials stored outdoors which pose a threat to storm water quality.','There are no outdoor storage areas on site.','The materials stored outdoors are under protective cover to reduce exposure to potential storm water contact.','The finished ___ pose little to no risk to storm water contact.','The vehicles stored outdoors awaiting repairs have no structural damages which would pose a threat to storm water quality.'],
+     'N/A':['There are no materials stored outdoors at the location.','There are no outdoor storage areas on site.','There are no materials stored outdoors at the facility.','There are no outdoor storage areas on site. All other storage is within the enclosed buildings.','There are no outdoor storage areas as the business has closed.'],
+     No:['There are fluid containers stored outdoors and exposed to storm water contact. Relocate the materials indoors or store the fluids in adequately sized secondary containment and under cover to prevent storm water contact with the containers. Implement BMPs SC-10, SC-11, SC-31, SC-33, SC-34 and SC-43.',
+         'There are used tires and ___ stored outdoors and exposed to potential storm water contact. Store the tires and parts off the ground and under cover until proper disposal arrangements can be completed. Implement BMPs SC-10, SC-33, SC-34 and SC-43.',
+         'There are batteries stored outdoors. Store the batteries indoors until proper recycling or disposal arrangements can be completed. Implement BMPs SC-10, SC-11, SC-33 and SC-34.',
+         'There are ___ stored outdoors. Relocate the materials indoors if feasible. If materials stay outdoors, store the materials off the ground and under cover until proper disposal can be completed. Implement BMPs SC-10, SC-11, SC-33 and SC-34.',
+         'There are 55 gallon liquid containers stored outdoors that require your attention. Relocate the 55 gallon drums indoors if feasible, or provide adequately sized secondary containment and protective cover to reduce exposure to storm water contact. Implement BMPs SC-10, SC-11, SC-31, SC-33, and SC-34.',
+         'The grease bins at the trash enclosure require your attention. Clean the drums of the excess oil. Provide an adequately sized secondary containment device under the drums to prevent oil/grease from contacting the concrete and entering the flow line. Implement BMPs SC-10, SC-11, SC-31, SC-34 and SC-41.',
+         'The grease trap at the rear of the site requires your attention. Clean the outside of the grease trap to remove the excess grease and materials. Keep the grease trap clean to prevent storm water contact and potential runoff from the site. Implement BMPs SC-10, SC-11, SC-34 and SC-43.',
+         'There is evidence of grease spills at the top and sides of the grease tank, and grease spills under the tank. Clean the grease tank and the spills and provide adequate secondary containment under the tank if it is to remain outdoors. Install waterproof covers on the grease tank before a rain event. Implement BMPs SC-10, SC-11, and SC-34.',
+         'There is an old ___ stored outdoors which requires disposal. Remove it from the site and dispose of the equipment properly or store the unit indoors to reduce exposure to storm water contact. Implement BMPs SC-33 and SC-34.',
+         'There is trash and debris around the storage yard which requires maintenance. Collect the waste and debris from the storage yard and dispose of the materials in the waste bins on site. Implement BMPs SC-34 and SC-43.',
+         'There is contaminated absorbent material at the ___ that requires collection. Collect the waste and dispose of the materials in the hazardous waste container on site. Perform routine site inspections to keep fluid stains at a minimum. Implement BMPs SC-10, SC-11, SC-34, and SC-43.',
+         'There is a ___ leaking fluids onto the soil. Collect the contaminated soil and dispose of the waste through a hazardous waste disposal company. Provide protection under the equipment until repairs can be completed. Implement BMPs SC-10, SC-11, SC-32, SC-34, SC-40 and SC-43.',
+         'The portable toilet requires maintenance. Provide a secondary containment tray under the portable toilet to prevent fluid leaks from contacting the ground. Implement BMPs SC-10 and SC-31.',
+         'There are recycle materials stored outdoors and exposed to storm water contact. Relocate the materials indoors or store within a storm resistant shelter to prevent storm water contact. Implement BMPs SC-10, SC-33 and SC-34.',
+         'Do not store construction materials or debris on site. Remove the non business related materials or dispose of the materials properly at a waste disposal facility. Implement BMPs SC-33 and SC-34.']},
+ b2:{Yes:['The outdoor eating area is clean and well maintained.','The fuel island has a built in canopy which provides adequate protection against potential storm water contact during the vehicle refueling operations.','The pool area is clean and well maintained.','There are no outdoor activity process areas.','The outdoor ___ area is covered to prevent storm water contact, and is well maintained.','The outdoor storage area is clean and well maintained.'],
+     'N/A':['There are no outdoor activity process areas on site.','There are no outdoor activity process areas.','There are no outdoor activity process areas or eating locations at the restaurant.'],
+     No:['There are visible fluid stains at the parking stall locations. Use dry clean up methods to remove the fluid stains. Collect the dry hazardous waste and dispose of the materials in a hazardous waste container. Implement BMPs SC-10, SC-11, SC-34 and SC-43.',
+         'The areas in the loading bays and under hooked up trailers have visible fluid stains. Use dry cleanup methods to remove the visible fluid stains, dispose of the waste in a hazardous waste container. Implement BMPs SC-30, SC-34, and SC-43.',
+         'The drive-thru area and the parking stalls in front of the restaurant require maintenance. Use dry cleanup methods to remove the visible fluid stains. Dispose of the waste in a hazardous waste container until proper disposal can be completed through a hazardous waste reclamation facility. Implement BMPs SC-10, SC-11, SC-34, SC-41 and SC-43.',
+         'There are visible fluid stains throughout the fuel island drive isles and at the parking stalls adjacent to the convenience store. Use dry clean up methods to remove the fluid stains. Collect the dry hazardous waste and dispose of the materials in the hazardous waste drum on site. Perform routine site maintenance to keep fluid stains at a minimum. Implement BMPs SC-10, SC-11, SC-34, SC-43 and SC-44.',
+         'There is visible evidence of various fluid stains on the paved surfaces of the work area and the vehicle storage locations. Use dry clean up methods, such as rags or absorbent materials to remove the fluid stains and dispose of the waste materials properly in the hazardous waste drum on site. Provide drip pans under the vehicles awaiting repairs to prevent potential fluid leaks from contacting the paved surfaces. Implement BMPs SC-11, SC-22, SC-34 and SC-43.',
+         'The compactor areas have visible hydraulic fluid stains. Use dry cleanup methods to remove the fluid stains, dispose of the waste in a hazardous waste container. Implement BMPs SC-30, SC-34, and SC-43.',
+         'The irrigation system at the ___ requires maintenance as the area is flooded. Repair the irrigation to prevent standing water and potential vector issues. Implement BMPs SC-41 and SC-44.',
+         'There is ___ visible in the loading bay area that requires your immediate attention. Sweep or vacuum the material from the loading bay areas and dispose of the waste properly. Implement BMPs SC-30, SC-34, and SC-43.',
+         'The outdoor ___ area is exposed to potential storm water contact. This area falls under industrial permit coverage, submit the required permit coverage documentation in the SMARTS database and supply a SWPPP for the site. Implement BMPs SC-10, SC-33 and SC-44.']},
+ b3:{Yes:['The forklift maintenance is performed by a mobile operator. The fluids and wastes are collected for disposal off site.','There are no vehicle or equipment maintenance operations or washing facilities on site.','Vehicle repairs occur inside of an enclosed garage building or under the awning alongside the building.','The truck maintenance is performed in a dedicated building on site. The waste and fluids are collected for proper disposal off site.','The car wash facility is enclosed and the water is recycled on site.'],
+     'N/A':['No vehicle washing or equipment maintenance operations are performed on site.','There are no vehicle or equipment maintenance operations performed on site.'],
+     No:['Vehicle repairs were observed outdoors. Vehicle repairs should be performed inside the enclosed structure or under a storm resistant shelter. Implement BMPs SC-10, SC-11, SC-22 and SC-43.',
+         'Provide drip pans under the vehicles awaiting repairs to prevent potential fluid leaks from contacting the paved surfaces. Implement BMPs SC-11, SC-22 and SC-43.',
+         'There are visible fluid stains at the ___. Use dry clean up methods to remove the stains and properly dispose of the contaminated waste in a hazardous waste container. Use a mop and bucket to remove the stains at the sidewalk and at the waste receptacle area. Dispose of the wastewater in the sanitary sewer sink inside. Implement BMPs SC-10, SC-11, and SC-34.']},
+ b4:{Yes:['The waste receptacles have the required lids and they are closed at the time of the inspection.','The waste receptacle has the required lids and they are closed at the time of the inspection.','The waste receptacle area is clean and the lids were closed at the time of the inspection.','The waste receptacles have the required lids and they are stored in an enclosed area at the location.'],
+     'N/A':['No waste bins on site as the business has closed.'],
+     No:['The waste receptacle area requires your attention. Collect the trash and debris from the ground around the waste bins and dispose of the materials properly. Implement BMPs SC-10, SC-11, SC-34 and SC-43.',
+         'The waste receptacles were open at the time of inspection. Keep lids closed to prevent contact with storm water and potential wind blown debris. Train employees to keep waste bin lid closed. Implement BMPs SC-10, and SC-34.',
+         'The waste receptacles require lids. Contact the service provider and have the waste receptacle replaced or have the lids replaced to prevent storm water contact with the contents of the waste bin. Implement BMPs SC-10, SC-11, SC-34 and SC-41.',
+         'The open waste receptacles require a tarp and bungees to secure the tarp and cover the receptacle to prevent storm water contact. Implement BMPs SC-31 and SC-34.',
+         'There is trash and debris on the ground at the ___ area. Collect the waste and properly dispose of the material in the waste bin on site. Implement BMPs SC-34, and SC-43.',
+         'The 40 yard waste bins require protective cover when in use. Supply tarps to cover the waste materials until the dumpster is removed from the site. Implement BMP SC-34.',
+         'A mop and bucket may be used to remove the stains at the waste receptacle area with the waste water disposed of in the mop sink inside. Implement BMPs SC-10, SC-11, and SC-34.']},
+ b5:{Yes:['The flow lines are clean and well maintained. There are no signs of any discharges from the site.','The flow lines are clean and well maintained with no signs of any discharges from the site.','The flow lines and drainage areas are clean and well maintained with no signs of any discharges from the site.','The location is clean and well maintained.','The fuel area and driveways are well maintained and free of excess staining. There are no signs of any discharges from the location.'],
+     'N/A':[],
+     No:['There are visible fluid stains at the ___. Use dry cleanup methods to remove the fluid stains. Collect the waste and dispose of the materials in a hazardous waste disposal container. Perform routine maintenance to keep fluid stains at a minimum. Implement BMPs SC-10, SC-11, SC-34, and SC-43.',
+         'There are visible fluid stains at the drive-thru isle and the waste receptacle area. Use dry cleanup methods to remove the fluid stains at the drive-thru isle. Collect the waste and dispose of the materials in a hazardous waste disposal container. A mop and bucket may be used to remove the stains at the waste receptacle area with the waste water disposed of in the mop sink inside of the restaurant. Perform routine site inspections and maintenance to keep staining at a minimum. Implement BMPs SC-10, SC-11, SC-34, SC-41, and SC-43.',
+         'The fuel island and parking stalls in front of the store have visible fluid stains. Use dry cleanup methods to remove the fluid stains from the concrete areas. Collect the waste and dispose of the materials properly in a hazardous waste container on site. Perform routine maintenance to keep fluid stains at a minimum. Implement BMPs SC-10, SC-11, SC-34, SC-43, and SC-44.',
+         'There is trash and landscape debris all along the parking lot areas and in the flow lines. Collect the waste and dispose of the materials properly. Sweep the flow lines clean of the landscape materials and dispose of the waste in the waste bins on site. Implement BMPs SC-11, SC-34, and SC-43.',
+         'Landscape and sediment debris along the curb and gutter locations require sweeping. Sweep the curb and gutter areas clean of the sediment and landscape debris and dispose of the waste in the waste bin on site. Implement BMPs SC-34, SC-41 and SC-43.',
+         'There is visible sediment and landscape debris in the ___ that requires your attention. Sweep up the debris and dispose of the waste properly in the waste bins on site. Provide routine maintenance to keep flow lines free of sediment and debris. Implement BMPs SC-10, SC-34, SC-41, and SC-43.',
+         'There are visible fluid stains at the loading dock areas. Use dry clean up methods to remove the stains and dispose of the waste in a hazardous waste container on site. Implement BMPs SC-10, SC-11, SC-34, and SC-43.',
+         'There is landscape debris and trash inside the drain inlet at the ___ that requires your attention. Remove the debris and waste from the catch basin and dispose of the waste properly. Implement BMPs SC-34, SC-43 and SC-44.',
+         'The catch basin at the ___ requires maintenance to unclog the drain. Collect the water from the clogged drain inlet and dispose of the waste properly. Keep the drain inlet location clean and free of excess debris. Implement BMPs SC-10, SC-34, and SC-44.',
+         'There is trash and debris at the ___ of the building. Collect the waste and dispose of the debris in the waste receptacle on site. Do not allow waste or debris to collect on the site. Implement BMPs SC-34 and SC-43.',
+         'There are visible fluid stains at the front of the garage bay areas. Use dry cleanup methods to remove the stains and dispose of the hazardous waste properly. Implement BMPs SC-10, SC-11, SC-34 and SC-43.',
+         'The screen at the drainage inlet requires repair. Repair the holes in the screen at the drain inlet to prevent materials from discharging from the site. Implement BMP SC-44.']},
+ b6:{Yes:['Absorbent material and a waste collection container are available on site for spill response.','Absorbent material and a hazardous waste container are available on site for spill response and waste handling.','A spill kit is available on site for spill response and waste handling.','A mop and bucket are available on site for spill response.'],
+     'N/A':[],
+     No:['Provide absorbent material and a waste collection container on site for spill response and waste handling. Train employees in proper spill response and waste handling practices. Implement BMPs SC-10, SC-11 and SC-34.',
+         'A spill kit is required for the location. Provide absorbent material and a waste collection container on site for spill response and waste handling. Implement BMPs SC-10, SC-11 and SC-34.',
+         'Provide a spill kit with absorbent material and a waste collection container on site. Train employees in spill response and waste handling practices. Implement BMPs SC-10, SC-11, and SC-34.',
+         'Absorbent material is available on site for spill response. Please provide a replacement hazardous waste collection container on site. Implement BMPs SC-10, SC-11 and SC-34.',
+         'Provide a spill kit for the site to respond to the oil/grease stains at the ___. Provide a hazardous waste bin for the contaminated materials after cleanup has been performed. Train employees in proper spill response and waste handling practices. Implement BMPs SC-10, SC-11 and SC-34.',
+         'Provide absorbent material and a waste collection container at the truck bays for spill response. Train employees in proper spill response and waste handling practices. Implement BMPs SC-10, SC-11, SC-34 and SC-43.']},
+ b7:{Yes:['The site is covered in asphalt and concrete with well landscaped planter areas and shows no signs of erosion.','The site is covered in concrete and shows no signs of erosion.','The site is covered in asphalt and concrete and shows no signs of erosion.','The site is covered in concrete with well landscaped planter areas and shows no signs of erosion.','There are no signs of any erosion as the planter areas are well landscaped.'],
+     'N/A':['The site is relatively flat and has established native vegetation growth which provides adequate erosion control. Access roads are routinely maintained.'],
+     No:['There are exposed soil areas at the ___ showing signs of erosion. Stabilize the exposed areas and install sediment controls to prevent sediment from leaving the site. Implement BMPs SC-40 and SC-41.']}
+};
+// Extra lines for Checklist Comments, from the same reports.
+const EXTRA_LINES=[
+ ['Business Registration expired','The Business Registration requires renewal. Contact the Business Registration Department at 951-955-1400 to remit payment.'],
+ ['Post the registration','Post the current business registration on site.'],
+ ['Needs a spill kit','Provide a spill kit for the location.'],
+ ['NEC required','The location is required to have industrial permit coverage, a No Exposure Certification is required. Provide documentation of the coverage once the NEC application is completed and accepted.'],
+ ['NEC expired','The NEC is expired, enter current info into the SMARTS database to bring the NEC current. WDID# ___'],
+ ['Needs NEC coverage','Provide NEC permit coverage for the location through the SMARTS database.'],
+ ['Needs permit coverage','Provide permit coverage for the location through the SMARTS database.'],
+ ['Operates under NEC','The site operates under a No Exposure Certification. WDID# ___'],
+ ['Needs permit + SWPPP','The location performs industrial activities outdoors exposed to storm water contact and is subject to industrial permit coverage. Submit the required permit coverage documentation in the SMARTS database and supply a SWPPP for the site.'],
+ ['Follow-up inspection','A follow up inspection is required in 45 days.'],
+ ['Business closed','I performed the site NPDES inspection and found the facility to be closed and moved from the location.']
+];
+const CORRECTIVE_LINES=['None.','Corrections issued.','Follow up inspection required in 45 days.'];
+function contactPhrase(r){const t=(r.contactTitle||'').trim(),n=(r.contactName||'').trim();return t&&n?'the '+t+' '+n:n?n:t?'the '+t:'the manager'}
+function photoTo(){const e=S.settings.email||'___',p=(S.settings.phone||'').trim();return e+(p?' or by text to '+p:'')}
+function templates(r){const days=r.photoDays||S.settings.photoDays||'30',who=contactPhrase(r);return{
+ okComments:'I performed the site NPDES inspection with '+who+' and found the location to be compliant.',
+ okEnf:'NPDES inspection performed and the facility is compliant.',
+ fixComments:'I performed the site NPDES inspection with '+who+' and discussed the corrections issued. Please provide photo documentation of the completed corrections to '+photoTo()+' within '+days+' days. If the photos are not received, a follow up inspection will be required.',
+ fixEnf:'NPDES inspection performed and corrections issued. Photo documentation required within '+days+' days. If the photos are not received, a follow up inspection will be required.'}}
+function hasCorrections(r){return BMPQ.some(([k])=>r[k]==='No')||(r.compliance&&r.compliance!==COMPLIANCE[0])}
+
+/* ---------- storage: on this device (home-screen apps keep it; Backup moves it between devices) ---------- */
+const S={items:{},settings:{inspector:'',email:'',phone:'',photoDays:'30'}};
+const LKEY='brp-fieldbook-v1';
+function localLoad(){try{const j=JSON.parse(localStorage.getItem(LKEY)||'{}');S.items=j.items||{};S.settings={...S.settings,...(j.settings||{})}}catch(e){}}
+let saveErr=false;
+function localSave(){try{localStorage.setItem(LKEY,JSON.stringify({items:S.items,settings:S.settings}));saveErr=false}catch(e){saveErr=true}}
+function boot(){
+  localLoad();render();
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+  addEventListener('storage',e=>{if(e.key===LKEY&&view.name!=='insp'){localLoad();render()}});
+}
+const pending={};function touch(id){S.items[id].updatedAt=Date.now();localSave();updateSaveLabel()}
+function flush(){}
+function removeItem(id){delete S.items[id];localSave()}
+function saveSettings(){localSave()}
+function updateSaveLabel(){const el=document.getElementById('saveLbl');if(!el)return;
+  el.className='save'+(saveErr?' err':'');
+  el.textContent=saveErr?'Not saved: storage full':'Saved on this device'}
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function todayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function usDate(iso){const [y,m,d]=iso.split('-');return m+'/'+d+'/'+y}
+function longDate(iso){const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})}
+function shortDate(iso){const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'})}
+
+function newId(){return 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function dayItems(day){return Object.entries(S.items).filter(([,v])=>v.day===day).sort((a,b)=>(a[1].order||0)-(b[1].order||0))}
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3000)}
+function flagged(r){return hasCorrections(r)}
+function chipOn(r,key,text,mode){const cur=(r[key]||'').trim();return mode==='set'?cur===text:cur.includes(text)}
+
+/* Corrections share one "Implement BMPs …" sentence at the end, listing every code once. */
+const IMPL=/\s*Implement BMP'?s?,?\s+[^.]*\.?/gi;
+function bmpCodes(t){return (t.match(/SC-?\s?\d+/gi)||[]).map(c=>'SC-'+c.replace(/\D/g,''))}
+function implLine(codes){codes=[...new Set(codes)].sort((a,b)=>parseInt(a.slice(3))-parseInt(b.slice(3)));
+  if(!codes.length)return '';if(codes.length===1)return 'Implement BMP '+codes[0]+'.';
+  return 'Implement BMPs '+codes.slice(0,-1).join(', ')+(codes.length>2?',':'')+' and '+codes[codes.length-1]+'.'}
+const reEsc=t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+
+/* Answers most sites get, taken from the filed reports. "Fill typical" only fills blanks. */
+const TYPICAL={
+  check:{facilityActive:'Yes',facilityPermitted:'Yes',swpppPresent:'N/A',recordsCurrent:'Yes',samplingData:'N/A',bmpsAcceptable:'Yes',goodHousekeeping:'Yes',erosionPresent:'No',washouts:'No',downstreamErosion:'No',floatable:'N/A',illicit:'N/A',nonStormwater:'N/A',returnRequired:'No',reportProvided:'Yes',mandatory:'N/A',conditional:'N/A'},
+  poll:{pOil:'Yes',pBacteria:'No',pMetals:'No',pNutrients:'No',pTrash:'Yes',pPesticides:'No',pSediment:'Yes',pOrganics:'No'},
+  permit:{gSubject:'No',gMandCond:'N/A',gNec:'N/A',gSwppp:'N/A',gBmpsPerSwppp:'N/A',gMonitoring:'N/A',gSamples:'N/A'}
+};
+
+/* ---------- icons ---------- */
+const IC={
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>',
+  chev:'<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9.5" fill="currentColor" stroke="none"/><path d="M12 7.5v9M7.5 12h9" stroke="#fff"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  circle:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/><g class="on"><circle cx="12" cy="12" r="10.8" fill="currentColor"/><path d="M7.5 12.3l3 3 6-6.3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></g></svg>',
+  mail:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></svg>',
+  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>',
+  next:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
+  list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg>'
+};
+
+/* ---------- steps of an inspection ---------- */
+const STEPS=[
+  {id:'notes',name:'Notes',keys:[]},
+  {id:'facility',name:'Facility',keys:['facilityId','inspectionId','facilityName','date','inspector','email']},
+  {id:'check',name:'Checklist',keys:CHECK.map(c=>c[0])},
+  {id:'poll',name:'Pollutants',keys:POLL.map(c=>c[0])},
+  {id:'permit',name:'Industrial Permit',keys:GIP.map(c=>c[0])},
+  {id:'bmp',name:'BMPs',keys:BMPQ.map(c=>c[0])},
+  {id:'wrap',name:'Comments',keys:['checklistComments','enforcement','corrective']},
+  {id:'status',name:'Status',keys:['compliance','enforcementAction','sic','priority']},
+  {id:'finish',name:'Review',keys:[]}
+];
+function filled(r,k){return /^b\d$/.test(k)?!!(r[k]&&(r[k+'n']||'').trim()):!!(r[k]&&String(r[k]).trim())}
+function stepCount(r,s){return s.keys.filter(k=>filled(r,k)).length}
+
+/* ---------- views ---------- */
+const view={name:'home',day:todayISO(),id:null,q:'',step:0,anim:'fade',reveal:null,justDone:null};
+function go(name,extra){Object.assign(view,{name,anim:'push-f',edit:false,confirm:null,chk:null},extra||{});render();scrollTo(0,0)}
+function goBack(name,extra){Object.assign(view,{name,anim:'push-b',edit:false,confirm:null,chk:null},extra||{});render();scrollTo(0,0)}
+function goStep(i){if(i<0||i>=STEPS.length||i===view.step)return;view.anim=i>view.step?'push-f':'push-b';view.step=i;closeSheet();render();scrollTo(0,0)}
+function rerender(){const y=scrollY;render();scrollTo(0,y)}
+/* ---------- double-check list from Fill Out Report ---------- */
+const KEY_LABEL=Object.assign({facilityId:'Facility ID',inspectionId:'Inspection ID',facilityName:'Facility Name',date:'Date',inspector:'Inspector',email:'E-Mail',contactName:'Contact name',contactTitle:'Contact title',
+  checklistComments:'Checklist comments',enforcement:'Enforcement',corrective:'Corrective actions',photoDays:'Photos due',outcome:'Outcome',
+  compliance:'Compliance status',enforcementAction:'Enforcement Action',sic:'SIC code',revisedSic:'Revised SIC',priority:'Priority',revisedPriority:'Revised priority'},
+  ...[...CHECK,...POLL,...GIP].map(([k,l])=>({[k]:l.length>48?l.slice(0,46).trim()+'…':l})),
+  ...BMPQ.map(([k],j)=>({[k]:'Question '+(j+1),[k+'n']:'Question '+(j+1)})));
+function keyStep(k){
+  const base=String(k||'').replace(/(^b\d)(n|sel)$/,'$1');
+  const extra={contactName:1,contactTitle:1,photoDays:6,outcome:6,revisedSic:7,revisedPriority:7};
+  if(base in extra)return extra[base];
+  const j=STEPS.findIndex(s=>s.keys.includes(base));return j<0?0:j}
+function guessKey(t){t=String(t).toLowerCase();
+  const pairs=[[/inspection id|brp\d|brp number/,'inspectionId'],[/facility id|brpc/,'facilityId'],[/sic/,'sic'],[/e-?mail/,'email'],[/contact|title|manager name|who/,'contactName'],[/priority/,'priority'],[/photo|days/,'photoDays'],[/complian/,'compliance'],[/non-?storm|wash|discharge|illicit/,'nonStormwater'],[/correct/,'corrective']];
+  for(const [re,k] of pairs)if(re.test(t))return k;
+  for(const [k,l] of [...BMPQ,...CHECK,...POLL,...GIP]){const w=l.toLowerCase().match(/[a-z]{5,}/g)||[];if(w.some(x=>t.includes(x)))return BMPQ.some(b=>b[0]===k)?k+'n':k}
+  return ''}
+function chkList(r){return (r.aiCheck||[]).map(c=>typeof c==='string'?{key:guessKey(c),note:c}:c)}
+function chkBar(r){const L=chkList(r),x=view.chk;if(x==null||!L[x])return '';const c=L[x];
+  return `<div class="chkbar" role="region" aria-label="Double-check"><div class="in">
+    <div class="top"><b>Check ${x+1} of ${L.length}</b><span>· ${esc(STEPS[keyStep(c.key)].name)}${KEY_LABEL[c.key]?' · '+esc(KEY_LABEL[c.key]):''}</span><button class="navbtn x" id="chkClose" aria-label="Close">Close</button></div>
+    <div class="note">${esc(c.note)}</div>
+    <div class="acts"><button id="chkPrev" ${x===0?'disabled':''} aria-label="Previous">${IC.back}</button><button class="good ${c.ok?'ok':''}" id="chkOk">${c.ok?'Checked ✓':'Looks Good'}</button><button id="chkNext" ${x===L.length-1?'disabled':''} aria-label="Next">${IC.next}</button></div>
+  </div></div>`}
+function chkTarget(k){
+  const base=String(k||'').replace(/(^b\d)(n|sel)$/,'$1');
+  let el=document.querySelector(`#app [data-t="${k}"]`)||document.querySelector(`#app [data-k="${k}"]`)||document.querySelector(`#app #q_${base}`)||document.querySelector(`#app [data-t="${base}"]`);
+  if(el&&/^b\d$/.test(base)&&/n$/.test(k)){const t=document.querySelector(`#app [data-t="${k}"]`);el=t||el}
+  if(!el)return null;
+  if(el.matches('.cell[data-k]'))return el.closest('.cells')||el;
+  return el.closest('.cell,.cell-x,.qrow,.qstack')||el}
+function goChk(x){const r=S.items[view.id],L=chkList(r);if(!L[x])return;
+  view.chk=x;const st=keyStep(L[x].key);
+  if(st!==view.step){view.anim=st>view.step?'push-f':'push-b';view.step=st;closeSheet();render()}else rerender();
+  requestAnimationFrame(()=>{const el=chkTarget(L[x].key);
+    if(!el){scrollTo({top:0,behavior:'smooth'});return}
+    el.classList.remove('hl');void el.offsetWidth;el.classList.add('hl');
+    const box=el.getBoundingClientRect(),room=innerHeight-260;
+    scrollTo({top:Math.max(0,scrollY+box.top-Math.max(70,(room-box.height)/2)),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})})}
+
+function render(){
+  const app=$('#app');
+  app.innerHTML=view.name==='home'?homeHTML():view.name==='day'?dayHTML():inspHTML();
+  if(view.anim){const t=app.querySelector('.body');if(t)t.classList.add(view.anim==='fade'?'fadein':view.anim);view.anim=null}
+  document.body.classList.toggle('has-chk',view.name==='insp'&&view.chk!=null);
+  bind();onScroll();
+  view.reveal=null;view.justDone=null;
+}
+function onScroll(){const n=document.querySelector('.nav');if(n)n.classList.toggle('scrolled',scrollY>30)}
+addEventListener('scroll',onScroll,{passive:true});
+
+function medDate(iso){const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}
+function nav(left,mid,right){return `<div class="nav"><span class="l">${left||''}</span><span class="mid">${esc(mid)}</span><span class="r">${right||''}</span></div>`}
+function grpX(title,action,cells,foot){return `<section class="grp"><div class="ghrow"><h3 class="gh">${title}</h3>${action}</div><div class="cells">${cells}</div>${foot?`<p class="gf">${foot}</p>`:''}</section>`}
+function editBtn(){return `<button class="ghbtn ${view.edit?'on':''}" id="editToggle">${view.edit?'Done':'Edit'}</button>`}
+function confirmRow(key,text,yes){return `<div class="confirm-row open-down"><p>${text}</p><div class="acts"><button class="del" data-yes="${key}">${yes}</button><button class="keep" data-no>Cancel</button></div></div>`}
+function grp(title,cells,foot){return `<section class="grp">${title?`<h3 class="gh">${title}</h3>`:''}<div class="cells">${cells}</div>${foot?`<p class="gf">${foot}</p>`:''}</section>`}
+function seg(key,val,opts){opts=opts||['Yes','No','N/A'];const i=Math.max(0,opts.indexOf(val));
+  return `<div class="sc" role="group" style="--n:${opts.length};--i:${i}" data-v="${val&&opts.includes(val)?esc(val):''}"><span class="thumb"></span>${opts.map(o=>`<button type="button" data-k="${key}" data-v="${esc(o)}" aria-pressed="${val===o}">${esc(o)}</button>`).join('')}</div>`}
+function choices(key,val,opts){return opts.map(o=>`<button type="button" class="cell check" data-k="${key}" data-v="${esc(o)}" aria-pressed="${val===o}"><span class="txt" style="font-size:17px">${esc(o)}</span><span class="mark">${IC.check}</span></button>`).join('')}
+function field(key,label,val,type,extra){return `<label class="cell-x field"><span>${label}</span><input type="${type||'text'}" id="f_${key}" data-t="${key}" value="${esc(val)}" ${extra||''}></label>`}
+function area(key,label,val,ph){return `<label class="cell-x field"><span>${label}</span><textarea id="f_${key}" data-t="${key}" placeholder="${esc(ph||'')}">${esc(val)}</textarea></label>`}
+function checkRow(attrs,text,on,circle){return `<button type="button" class="cell check ${circle?'circle':''}" ${attrs} aria-pressed="${on}"><span class="txt">${text}</span><span class="mark">${circle?IC.circle:IC.check}</span></button>`}
+const blanks=t=>esc(t).replace(/___/g,'<span class="blank">___</span>');
+
+function homeHTML(){
+  const days={},done={};Object.values(S.items).forEach(v=>{days[v.day]=(days[v.day]||0)+1;if(v.status==='done')done[v.day]=(done[v.day]||0)+1});
+  const list=Object.keys(days).sort().reverse();
+  const q=view.q.trim().toLowerCase();
+  const hits=q?Object.entries(S.items).filter(([,v])=>[v.facilityId,v.inspectionId,v.facilityName].some(x=>(x||'').toLowerCase().includes(q))).sort((a,b)=>b[1].day.localeCompare(a[1].day)):[];
+  const needs=!S.settings.inspector||!S.settings.email;
+  return `${nav('','Field Book','')}
+  <div class="body">
+  <h1 class="big">Field Book</h1>
+  ${grp('New day',`<label class="cell-x field"><span>Date</span><input type="date" id="dayPick" value="${view.day}"></label>
+    <button class="cell accent" id="openDay">${days[view.day]?`<span class="main"><span class="ttl">Open ${esc(shortDate(view.day))}</span></span><span class="det">${days[view.day]}</span>${IC.chev}`:`${IC.plus}<span class="main"><span class="ttl">Add ${esc(shortDate(view.day))}</span></span>`}</button>`)}
+  ${list.length?grp('',`<label class="cell-x field"><span>Search</span><input type="search" id="find" placeholder="BRP number, BRPC number or business" value="${esc(view.q)}" autocomplete="off"></label>
+    ${q?(hits.length?hits.slice(0,12).map(([id,v])=>stopRow(id,v,null,true)).join(''):`<div class="cell"><span class="sub" style="font-size:15px">No matches</span></div>`):''}`):''}
+  ${list.length?grpX('Field days',editBtn(),list.map(d=>view.confirm==='day:'+d?confirmRow('day:'+d,`Delete ${esc(medDate(d))} and its ${days[d]} inspection${days[d]>1?'s':''}? This can’t be undone.`,'Delete Day'):
+      `<button class="cell" ${view.edit?`data-ask="day:${d}"`:`data-day="${d}"`}>${view.edit?'<span class="minus">−</span>':''}<span class="main"><span class="ttl">${esc(medDate(d))}</span><span class="sub">${days[d]} inspection${days[d]>1?'s':''}</span></span><span class="det ${done[d]===days[d]?'st-done':''}">${done[d]||0} of ${days[d]} done</span>${view.edit?'':IC.chev}</button>`).join(''),view.edit?'Tap a day to delete it and all of its inspections.':''):
+    grp('Field days',`<div class="cell"><span class="sub" style="font-size:15px;white-space:normal">Pick a date above and tap Add. Each day holds that day’s inspections.</span></div>`)}
+  ${grp('Your details',`${field('s_name','Inspector name',S.settings.inspector,'text','autocomplete="name" data-s="inspector"')}
+    ${field('s_email','Email for photo documentation',S.settings.email||'','email','autocomplete="email" autocapitalize="none" data-s="email"')}
+    ${field('s_phone','Cell for photos by text (optional)',S.settings.phone||'','text','inputmode="tel" autocomplete="tel" data-s="phone"')}`,
+    (needs?'Your name and email go on every report. ':'')+'Inspections save on this device. Use Backup below to move them to another device.')}
+  ${grp('Backup',`<button class="cell accent" id="bkSave"><span class="main"><span class="ttl">Save Backup File</span></span><span class="det">${Object.keys(S.items).length}</span></button>
+    <label class="cell accent tap" for="bkFile" style="cursor:pointer"><span class="main"><span class="ttl">Load Backup File</span></span></label><input type="file" id="bkFile" accept=".json,application/json" hidden>`,
+    'Save a backup to Files or email it to yourself, then load it on your phone or iPad. Loading adds inspections; it never deletes any.')}
+  </div>`;
+}
+
+function statusText(v){return v.status==='done'?'<span class="det st-done">Done</span>':flagged(v)?'<span class="det st-fix">Corrections</span>':'<span class="det st-open">Open</span>'}
+function stopRow(id,v,n,showDay){
+  return `<button class="cell" data-open="${id}"><span class="badge ${v.status==='done'?'done':''} ${view.justDone===id?'pop':''}">${v.status==='done'?IC.check:(n??'·')}</span><span class="main"><span class="ttl">${esc(v.facilityName||'Untitled inspection')}</span><span class="sub"><span class="mono">${esc(v.inspectionId||'No BRP number')}</span>${showDay?' · '+esc(usDate(v.day)):''}</span></span>${statusText(v)}${IC.chev}</button>`;
+}
+
+function dayHTML(){
+  const items=dayItems(view.day),done=items.filter(([,v])=>v.status==='done').length;
+  return `${nav(`<button class="navbtn" id="back">${IC.back}Days</button>`,shortDate(view.day),`<button class="navbtn" id="newDay">New Day</button>`)}
+  <div class="body">
+  <h1 class="big">${esc(medDate(view.day))}</h1>
+  <p class="bigsub">${items.length?`${done} of ${items.length} done`:'No inspections yet'}</p>
+  ${grpX('Inspections',items.length?editBtn():'',`${items.map(([id,v],i)=>view.confirm==='insp:'+id?confirmRow('insp:'+id,`Delete ${esc(v.facilityName||'this inspection')}? This can’t be undone.`,'Delete'):
+      view.edit?`<button class="cell" data-ask="insp:${id}"><span class="minus">−</span><span class="main"><span class="ttl">${esc(v.facilityName||'Untitled inspection')}</span><span class="sub"><span class="mono">${esc(v.inspectionId||'No BRP number')}</span></span></span>${statusText(v)}</button>`:stopRow(id,v,i+1)).join('')}
+    ${view.edit?'':`<button class="cell accent" id="addInsp">${IC.plus}<span class="main"><span class="ttl">Add Inspection</span></span></button>`}`)}
+  ${view.edit?grp('',view.confirm==='day:'+view.day?confirmRow('day:'+view.day,`Delete this whole day and its ${items.length} inspection${items.length===1?'':'s'}? This can’t be undone.`,'Delete Day'):`<button class="cell danger" data-ask="day:${view.day}">Delete This Day</button>`):''}
+  ${items.length&&!view.edit?grp('Export for QC',`<button class="cell accent" id="expEach"><span class="main"><span class="ttl">Email or Share All PDFs</span></span><span class="det">${items.length} PDF${items.length>1?'s':''}</span></button>
+    <button class="cell accent" id="expZip"><span class="main"><span class="ttl">Save All as ZIP</span></span></button>`,
+    'Each report is its own PDF, named like “BRP21055544 - Burlington Distribution Corp. 9-16-2026”.'):''}
+  </div>`;
+}
+
+function inspHTML(){
+  const r=S.items[view.id];if(!r){view.name='day';return dayHTML()}
+  const i=view.step,s=STEPS[i],last=STEPS.length-1;
+  const prog=`<div class="prog" aria-hidden="true">${STEPS.map((x,j)=>{const p=x.keys.length?stepCount(r,x)/x.keys.length:(j<=i?1:0);return `<i class="${j===i?'cur':''}" style="--p:${p}"></i>`}).join('')}</div>`;
+  return `${nav(`<button class="navbtn" id="back">${IC.back}Day</button>`,r.facilityName||'New Inspection',`<button class="navbtn" id="openSteps">Steps</button>`)}
+  ${prog}
+  <div class="body">
+  <h1 class="big">${esc(s.name)}</h1>
+  <p class="bigsub">${esc(r.facilityName||'New inspection')}${s.keys.length?` · <span id="stepCount">${stepCount(r,s)} of ${s.keys.length}</span>`:''} · <span id="saveLbl" class="save"></span></p>
+  ${STEP_HTML[s.id](r)}
+  </div>
+  ${chkBar(r)}
+  <div class="toolbar"><div class="in">
+    <span>${i>0?`<button class="navbtn" id="prevStep">${IC.back}Back</button>`:''}</span>
+    <span class="pos">${i+1} of ${STEPS.length}</span>
+    ${i<last?`<button class="pbtn" id="nextStep">Next ${IC.next}</button>`:`<button class="pbtn" id="emailPdf2">${IC.mail} Email</button>`}
+  </div></div>`;
+}
+
+function typical(group,label){return grp('',`<button class="cell accent" data-typical="${group}"><span class="main"><span class="ttl">Fill Typical Answers</span></span></button>`,label)}
+
+const STEP_HTML={
+  notes:r=>`${grp('Your notes',`<label class="cell-x field"><span>Type or dictate. Shorthand is fine.</span><textarea id="f_notes" data-t="notes" style="min-height:190px" placeholder="del taco van buren BRP22147366 BRPC044151 met diana mgr. fluid stains drive thru aisle, trash lids open, no spill kit, BR expired. 45 days">${esc(r.notes)}</textarea></label>`,
+      'Your own notes while you walk the site. They are not printed on the form. Tap the microphone on the keyboard to talk instead of type.')}
+    ${grp('',`<button class="cell accent" id="skipNotes"><span class="main"><span class="ttl">Start the form</span></span>${IC.chev}</button>`)}`,
+  facility:r=>`${grp('Printed on the form',`<div class="row2">${field('facilityId','Facility ID',r.facilityId,'text','autocomplete="off" autocapitalize="characters" placeholder="BRPC…"')}${field('inspectionId','Inspection ID',r.inspectionId,'text','autocomplete="off" autocapitalize="characters" placeholder="BRP…"')}</div>
+      ${field('facilityName','Facility Name',r.facilityName,'text','placeholder="Business name"')}
+      <div class="row2">${field('date','Inspection Date',r.date)}${field('inspector','Inspector',r.inspector)}</div>
+      ${field('email','E-Mail Report',r.email,'email','autocomplete="off" autocapitalize="none" placeholder="Business email"')}`)}
+    ${grp('Walked the site with',`<div class="row2">${field('contactName','Name',r.contactName,'text','autocomplete="off" placeholder="Diana"')}${field('contactTitle','Title',r.contactTitle,'text','list="titleList" autocomplete="off" placeholder="Manager"')}</div>
+      <datalist id="titleList">${['Manager','General Manager','Owner','Facilities Supervisor','Maintenance Technician','Production Manager'].map(t=>`<option value="${t}">`).join('')}</datalist>`,'Not printed. Used to write your comments.')}`,
+  check:r=>`${typical('check','Fills only the blanks, with the usual answers for a commercial site.')}
+    ${grp('Checklist items',CHECK.map(([k,l])=>`<div class="cell qrow"><span>${l}</span>${seg(k,r[k])}</div>`).join(''))}`,
+  poll:r=>`${typical('poll','Oil & Grease, Trash/Debris and Sediment: Yes. Everything else: No.')}
+    ${grp('Pollutants',POLL.map(([k,l])=>`<div class="cell qrow"><span>${l}</span>${seg(k,r[k])}</div>`).join(''))}`,
+  permit:r=>`${typical('permit','Not an industrial site: the first question is No, the rest N/A.')}
+    ${grp('CA General Industrial Permit',GIP.map(([k,l])=>`<div class="cell-x qstack"><span class="ql">${esc(l)}</span>${seg(k,r[k])}</div>`).join(''))}`,
+  bmp:r=>BMPQ.map(([k,l],j)=>{const a=r[k],list=a?(PHRASES[k][a]||[]):[],sel=r[k+'sel']||[],open=a||r[k+'n'];
+      return grp(`Question ${j+1}`,`<div class="cell-x qstack" id="q_${k}"><span class="ql">${esc(l)}</span>${seg(k,a)}</div>
+        ${open?`<div class="${view.reveal===k?'open-down':''}">
+          ${a==='No'?list.map((p,x)=>checkRow(`data-bmp="${k}" data-i="${x}"`,blanks(p.replace(IMPL,'').trim()),sel.includes(x))).join('')
+            :list.length>1?list.map((p,x)=>checkRow(`data-set="${k}n" data-p="${k}|${a}|${x}"`,blanks(p),chipOn(r,k+'n',p,'set'),true)).join(''):''}
+          ${area(k+'n','On the form',r[k+'n'])}</div>`:''}`,
+        a==='No'&&j===0?'Check every correction that applies. The BMP codes are listed once, at the end.':'')}).join(''),
+  wrap:r=>{const rec=hasCorrections(r)?'fix':'ok',days=r.photoDays||S.settings.photoDays||'30';
+    return `${grp('How did it go?',`<button class="cell check circle" id="fillOk" aria-pressed="${r.outcome==='ok'}"><span class="txt" style="font-size:17px">Compliant</span>${rec==='ok'?'<span class="tag">Suggested</span>':''}<span class="mark">${IC.circle}</span></button>
+        <button class="cell check circle" id="fillFix" aria-pressed="${r.outcome==='fix'}"><span class="txt" style="font-size:17px">Corrections issued</span>${rec==='fix'?'<span class="tag">Suggested</span>':''}<span class="mark">${IC.circle}</span></button>
+        <div class="cell qrow"><span>Photos due in</span>${seg('photoDays',days,['30','45','60'])}</div>`,
+        `Writes all three boxes below in the standard wording, with ${esc(contactPhrase(r).replace(/^the /,''))}${r.contactName?'':' (add a name in Facility)'} and ${esc(S.settings.email||'your email')}.`)}
+    ${grp('Checklist comments',area('checklistComments','On the form',r.checklistComments))}
+    ${grp('Add to comments',EXTRA_LINES.map((p,x)=>checkRow(`data-add="checklistComments" data-p="x:${x}"`,esc(p[0]),chipOn(r,'checklistComments',p[1]))).join(''))}
+    ${grp('Enforcement',area('enforcement','On the form',r.enforcement))}
+    ${grp('Corrective actions',CORRECTIVE_LINES.map((p,x)=>checkRow(`data-set="corrective" data-p="cl:${x}"`,esc(p),chipOn(r,'corrective',p,'set'),true)).join('')+area('corrective','On the form',r.corrective))}`},
+  status:r=>`${grp('Compliance status',choices('compliance',r.compliance,COMPLIANCE))}
+    ${grp('',`<div class="cell qrow"><span>Enforcement Action</span>${seg('enforcementAction',r.enforcementAction)}</div>`)}
+    ${grp('SIC code',`<div class="row2">${field('sic','SIC Code',r.sic,'text','list="sicList" inputmode="numeric" autocomplete="off" placeholder="5812"')}${field('revisedSic','Revised (optional)',r.revisedSic,'text','list="sicList" inputmode="numeric" autocomplete="off"')}</div>
+      <datalist id="sicList">${SIC.map(s=>`<option value="${s[0]}">${esc(s[1])}</option>`).join('')}</datalist>`)}
+    ${grp('Inspection priority',`<div class="cell-x qstack">${seg('priority',r.priority,PRIORITY)}</div>`)}
+    ${grp('Revised priority (optional)',`<div class="cell-x qstack">${seg('revisedPriority',r.revisedPriority,PRIORITY)}</div>`)}`,
+  finish:r=>{const total=STEPS.slice(0,-1).reduce((a,s)=>a+s.keys.length-stepCount(r,s),0);
+    return `${grp('',STEPS.slice(0,-1).map((s,j)=>{if(!s.keys.length)return '';const miss=s.keys.length-stepCount(r,s);
+        return `<button class="cell" data-step="${j}"><span class="main"><span class="ttl">${esc(s.name)}</span></span><span class="det ${miss?'':'st-done'}" style="${miss?'color:var(--warn)':''}">${miss?miss+' blank':'Complete'}</span>${IC.chev}</button>`}).join(''),
+      total?`${total} field${total>1?'s are':' is'} still blank. Tap a step to fill it, or make the PDF anyway.`:'Everything is filled in. Make the PDF and check it before you send it.')}
+    <button class="wide-btn" id="emailPdf">${IC.mail} Email Report</button>
+    ${grp('',`<button class="cell accent" id="makePdf2"><span class="main"><span class="ttl">Save or Print PDF</span></span>${IC.chev}</button>`,
+      r.email?`Email Report attaches the PDF. ${esc(r.email)} is copied, so paste it in the To line.`:'Email Report attaches the PDF. Add the business email in Facility to have it copied for you.')}
+    ${grp('',`<button class="cell center" id="markDone">${r.status==='done'?'Mark as Open':'Mark Inspection Done'}</button>
+      <button class="cell center" id="returnInsp">Start Return Inspection</button>`,r.status==='done'?'This inspection is marked done.':'Return inspection copies the facility info into a new inspection today.')}
+    ${grp('',`<div id="delZone"><button class="cell danger" id="delAsk">Delete Inspection</button></div>`)}`}
+};
+
+/* ---------- steps sheet ---------- */
+function openSheet(){
+  const r=S.items[view.id];if(!r)return;
+  $('#sheetRoot').innerHTML=`<div class="scrim" id="scrim"></div><div class="sheet" role="dialog" aria-label="Inspection steps"><div class="grab"></div><button class="navbtn" id="sheetDone" style="position:absolute;right:8px;top:8px;font-weight:600">Done</button><h3>Steps</h3>
+    ${grp('',STEPS.map((s,j)=>{const c=stepCount(r,s),full=s.keys.length&&c===s.keys.length;
+      return `<button class="cell" data-step="${j}"><span class="badge ${full?'done':''}" style="${j===view.step?'background:var(--accent);color:#fff':''}">${full?IC.check:j+1}</span><span class="main"><span class="ttl">${esc(s.name)}</span></span><span class="det">${s.keys.length?c+' of '+s.keys.length:''}</span>${IC.chev}</button>`}).join(''))}</div>`;
+  const root=$('#sheetRoot');
+  root.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>goStep(+b.dataset.step));
+  $('#scrim').onclick=closeSheet;$('#sheetDone').onclick=closeSheet;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>root.classList.add('sheet-open')));
+}
+function closeSheet(){const root=$('#sheetRoot');if(!root.classList.contains('sheet-open')){root.innerHTML='';return}
+  root.classList.remove('sheet-open');setTimeout(()=>{if(!root.classList.contains('sheet-open'))root.innerHTML=''},320)}
+
+/* ---------- events ---------- */
+function bind(){
+  const on=(id,ev,fn)=>{const el=document.getElementById(id);if(el)el.addEventListener(ev,fn)};
+  const tog=document.getElementById('editToggle');if(tog)tog.onclick=()=>{view.edit=!view.edit;view.confirm=null;rerender()};
+  document.querySelectorAll('[data-ask]').forEach(b=>b.onclick=()=>{view.confirm=b.dataset.ask;rerender()});
+  document.querySelectorAll('[data-no]').forEach(b=>b.onclick=()=>{view.confirm=null;rerender()});
+  document.querySelectorAll('[data-yes]').forEach(b=>b.onclick=async()=>{
+    const [kind,key]=b.dataset.yes.split(/:(.*)/);b.disabled=true;
+    if(kind==='insp'){await removeItem(key);view.confirm=null;
+      if(!dayItems(view.day).length)view.edit=false;rerender();toast('Inspection deleted');return}
+    const ids=Object.keys(S.items).filter(id=>S.items[id].day===key);
+    for(const id of ids)await removeItem(id);
+    view.confirm=null;toast(`Deleted ${medDate(key)}`);
+    if(view.name==='day')goBack('home');else{if(!Object.keys(S.items).length)view.edit=false;rerender()}});
+  document.querySelectorAll('#app [data-open]').forEach(b=>b.onclick=()=>{const v=S.items[b.dataset.open];go('insp',{id:b.dataset.open,day:v.day,step:0})});
+  if(view.name==='home'){
+    on('dayPick','change',e=>{if(e.target.value){view.day=e.target.value;rerender()}});
+    on('openDay','click',()=>go('day'));
+    on('find','input',e=>{view.q=e.target.value;const pos=e.target.selectionStart;rerender();const f=$('#find');f.focus();f.setSelectionRange(pos,pos)});
+    document.querySelectorAll('[data-s]').forEach(el=>el.addEventListener('change',()=>{S.settings[el.dataset.s]=el.value.trim();saveSettings()}));
+    document.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>go('day',{day:b.dataset.day}));
+    on('bkSave','click',saveBackup);on('bkFile','change',e=>loadBackup(e.target));
+    return;
+  }
+  if(view.name==='day'){
+    on('back','click',()=>goBack('home'));
+    on('newDay','click',()=>{goBack('home');const d=$('#dayPick');if(d){d.focus();try{d.showPicker()}catch(e){}}});
+    on('addInsp','click',()=>{const id=newId();
+      S.items[id]={kind:'inspection',day:view.day,order:Date.now(),status:'draft',date:usDate(view.day),inspector:S.settings.inspector||'',createdAt:Date.now()};
+      touch(id);go('insp',{id,step:0})});
+    on('expZip','click',exportZip);on('expEach','click',exportEach);
+    return;
+  }
+  const r=S.items[view.id];if(!r)return;
+  updateSaveLabel();
+  on('back','click',()=>{flush();goBack('day',{day:r.day})});
+  on('nextStep','click',()=>goStep(view.step+1));
+  on('prevStep','click',()=>goStep(view.step-1));
+  on('openSteps','click',openSheet);
+  document.querySelectorAll('#app [data-chk]').forEach(b=>b.onclick=()=>goChk(+b.dataset.chk));
+  on('chkPrev','click',()=>goChk(view.chk-1));on('chkNext','click',()=>goChk(view.chk+1));
+  on('chkClose','click',()=>{view.chk=null;rerender()});
+  on('chkOk','click',()=>{const L=chkList(r),x=view.chk;r.aiCheck=L;L[x].ok=!L[x].ok;touch(view.id);
+    if(!L[x].ok){rerender();return}
+    const nx=L.findIndex((c,j)=>j>x&&!c.ok),any=L.findIndex(c=>!c.ok);
+    if(nx>=0)goChk(nx);else if(any>=0)goChk(any);else{view.chk=null;rerender();toast('All checks done')}});
+  document.querySelectorAll('#app [data-step]').forEach(b=>b.onclick=()=>goStep(+b.dataset.step));
+  const refreshCount=()=>{const s=STEPS[view.step],el=$('#stepCount');if(el)el.textContent=stepCount(r,s)+' of '+s.keys.length;
+    const bar=document.querySelectorAll('.prog i')[view.step];if(bar&&s.keys.length)bar.style.setProperty('--p',stepCount(r,s)/s.keys.length)};
+  const syncChips=key=>document.querySelectorAll(`[data-add="${key}"],[data-set="${key}"]`).forEach(c=>c.setAttribute('aria-pressed',chipOn(r,key,phraseOf(c.dataset.p),c.dataset.set?'set':'add')));
+  document.querySelectorAll('[data-t]').forEach(el=>el.addEventListener('input',()=>{
+    const k=el.dataset.t;r[k]=el.value;touch(view.id);syncChips(k);refreshCount();
+    if(k==='facilityName'){const m=$('.nav .mid');if(m)m.textContent=el.value||'New Inspection'}
+    if(/^b\dn$/.test(k)&&!el.value.trim()){r[k.slice(0,2)+'sel']=[];document.querySelectorAll(`[data-bmp="${k.slice(0,2)}"]`).forEach(c=>c.setAttribute('aria-pressed',false))}
+  }));
+  const paintSeg=(box,k)=>{const btns=[...box.querySelectorAll('button')],idx=btns.findIndex(x=>x.dataset.v===r[k]);
+    btns.forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===r[k]));
+    if(box.classList.contains('sc')){const fromEmpty=!box.dataset.v;box.classList.toggle('snap',fromEmpty);if(idx>=0)box.style.setProperty('--i',idx);box.dataset.v=idx>=0?r[k]:''}};
+  document.querySelectorAll('#app [data-k]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k,v=b.dataset.v,box=b.parentElement;
+    if(k==='photoDays'){r.photoDays=v;S.settings.photoDays=v;saveSettings();touch(view.id);paintSeg(box,'photoDays');return}
+    r[k]=r[k]===v&&box.classList.contains('sc')?'':v;
+    if(/^b\d$/.test(k)){
+      const nk=k+'n',cur=(r[nk]||'').trim(),auto=!cur||Object.values(PHRASES[k]).flat().includes(cur);
+      if(auto){r[nk]=(r[k]==='Yes'||r[k]==='N/A')&&PHRASES[k][r[k]][0]||'';r[k+'sel']=[]}
+      touch(view.id);paintSeg(box,k);view.reveal=k;setTimeout(rerender,170);return}
+    touch(view.id);paintSeg(box,k);refreshCount();
+  });
+  document.querySelectorAll('[data-typical]').forEach(b=>b.onclick=()=>{const t=TYPICAL[b.dataset.typical];let n=0;
+    Object.keys(t).forEach(k=>{if(!r[k]){r[k]=t[k];n++}});touch(view.id);rerender();toast(n?`Filled ${n} blank${n>1?'s':''}`:'Nothing blank to fill')});
+  const phraseOf=p=>{if(p.startsWith('x:'))return EXTRA_LINES[+p.slice(2)][1];if(p.startsWith('cl:'))return CORRECTIVE_LINES[+p.slice(3)];const [q,a,i]=p.split('|');return PHRASES[q][a][+i]};
+  const setField=(key,val,focusBlank)=>{r[key]=val;touch(view.id);syncChips(key);refreshCount();const ta=document.getElementById('f_'+key);if(ta){ta.value=val;const at=focusBlank?val.lastIndexOf('___'):-1;if(at>=0){ta.focus();ta.setSelectionRange(at,at+3)}}};
+  document.querySelectorAll('[data-add]').forEach(c=>c.onclick=()=>{
+    const key=c.dataset.add,text=phraseOf(c.dataset.p),cur=(r[key]||'').trim();
+    if(cur.includes(text))setField(key,cur.replace(text,'').replace(/\s{2,}/g,' ').trim());
+    else setField(key,cur?cur+' '+text:text,true)});
+  document.querySelectorAll('#app [data-set]').forEach(c=>c.onclick=()=>setField(c.dataset.set,phraseOf(c.dataset.p),true));
+  document.querySelectorAll('[data-bmp]').forEach(c=>c.onclick=()=>{
+    const k=c.dataset.bmp,i=+c.dataset.i,key=k+'n',list=PHRASES[k].No;
+    let sel=(r[k+'sel']||[]).filter(j=>j!==i),text=(r[key]||'').replace(IMPL,' ').replace(/\s{2,}/g,' ').trim();
+    const body=list[i].replace(IMPL,'').trim(),adding=!(r[k+'sel']||[]).includes(i);
+    if(adding){sel.push(i);text=text?text+' '+body:body}
+    else text=text.replace(new RegExp(body.split('___').map(reEsc).join('[\\s\\S]*?')),'').replace(/\s{2,}/g,' ').trim();
+    r[k+'sel']=sel;
+    setField(key,[text,implLine(sel.flatMap(j=>bmpCodes(list[j])))].filter(Boolean).join(' '),adding);
+    c.setAttribute('aria-pressed',adding)});
+  const fillWrap=fix=>{
+    const t=templates(r);r.outcome=fix?'fix':'ok';
+    r.checklistComments=fix?t.fixComments:t.okComments;r.enforcement=fix?t.fixEnf:t.okEnf;r.corrective=fix?'Corrections issued.':'None.';
+    // In the filed reports these three always follow the outcome.
+    Object.assign(r,fix?{bmpsAcceptable:'No',goodHousekeeping:'No',returnRequired:'Yes'}:{bmpsAcceptable:'Yes',goodHousekeeping:'Yes',returnRequired:'No'});
+    if(!r.compliance)r.compliance=fix?'Correction Issued':COMPLIANCE[0];
+    if(!r.enforcementAction)r.enforcementAction=fix?'Yes':'No';
+    if(!r.reportProvided)r.reportProvided='Yes';
+    touch(view.id);rerender();toast(fix?'Written up with corrections':'Written up as compliant')};
+  on('fillOk','click',()=>fillWrap(false));on('fillFix','click',()=>fillWrap(true));
+  on('markDone','click',()=>{r.status=r.status==='done'?'draft':'done';touch(view.id);
+    if(r.status==='done'){flush();goBack('day',{day:r.day,justDone:view.id});toast('Inspection done')}else rerender()});
+  on('returnInsp','click',()=>{const id=newId(),d=todayISO();
+    S.items[id]={kind:'inspection',day:d,order:Date.now(),status:'draft',date:usDate(d),inspector:S.settings.inspector||r.inspector||'',facilityId:r.facilityId||'',facilityName:r.facilityName||'',email:r.email||'',sic:r.sic||'',priority:r.priority||'',contactName:r.contactName||'',contactTitle:r.contactTitle||'',returnOf:view.id,createdAt:Date.now(),
+      checklistComments:'Return inspection to verify corrections from the '+(r.date||usDate(r.day))+' inspection.'};
+    touch(id);go('insp',{id,day:d,step:0});toast('Return inspection added to today')});
+  on('delAsk','click',()=>{$('#delZone').innerHTML=`<div class="open-down"><div class="cell"><span class="sub" style="font-size:15px;white-space:normal">Delete ${esc(r.facilityName||'this inspection')} for good?</span></div><button class="cell danger" id="delYes">Delete</button><button class="cell center" id="delNo">Keep It</button></div>`;
+    on('delYes','click',async()=>{const d=r.day;await removeItem(view.id);goBack('day',{day:d});toast('Inspection deleted')});
+    on('delNo','click',()=>rerender())});
+  on('skipNotes','click',()=>goStep(1));
+  on('makePdf2','click',()=>makePdf('makePdf2'));on('emailPdf','click',()=>emailPdf('emailPdf'));on('emailPdf2','click',()=>emailPdf('emailPdf2'));
+  if(view.step===STEPS.length-1)warmPdf(r);
+}
+
+/* ---------- PDF ---------- */
+let template=null;
+// Filed as: "BRP21055544 - Burlington Distribution Corp. 9-16-2026.pdf"
+function fileName(r){
+  const d=(r.date||usDate(r.day)).trim().split(/[\/.-]/).map(x=>/^\d+$/.test(x)?String(+x):x).join('-');
+  return [(r.inspectionId||r.facilityId||'Inspection').trim(),'-',(r.facilityName||'').trim(),d].filter(Boolean).join(' ').replace(/[\\/:*?"<>|]+/g,'').replace(/\s+/g,' ')+'.pdf'}
+async function pdfFor(r){if(!template)template=await (await fetch('brp-form.pdf')).arrayBuffer();return BRPForm.fill(PDFLib,template.slice(0),r)}
+/* Getting files out: the share sheet on phones and iPads (Mail, Files, Print), a download elsewhere. */
+function asFile(bytes,name,type){return new File([bytes],name,{type:type||'application/pdf'})}
+function canShare(files){try{return !!(navigator.canShare&&navigator.canShare({files}))}catch(e){return false}}
+function download(file){const u=URL.createObjectURL(file),a=document.createElement('a');a.href=u;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)}
+async function shareOrSave(files,meta){
+  if(canShare(files)){try{await navigator.share({files,...(meta||{})});return 'shared'}catch(e){if(e&&e.name==='AbortError')return 'cancelled';throw e}}
+  files.forEach(download);return 'saved'}
+function exportList(){return dayItems(view.day).map(([,v])=>v)}
+/* Safari only opens the share sheet straight after a tap, so the PDF is made ahead of time. */
+const ready={};
+function warmPdf(r){const id=view.id,stamp=r.updatedAt||0;if(ready[id]&&ready[id].stamp===stamp)return ready[id].p;
+  const p=pdfFor(r).then(b=>asFile(b,fileName(r)));p.catch(()=>{});ready[id]={stamp,p};return p}
+async function getPdf(id){const r=S.items[id];const w=warmPdf(r);return w}
+function mailText(r){const fix=hasCorrections(r);
+  return {title:'NPDES Inspection Report - '+(r.facilityName||'')+' - '+(r.date||usDate(r.day)),
+    text:'Hello'+(r.contactName?' '+r.contactName.trim():'')+',\n\nAttached is the NPDES stormwater inspection report for '+(r.facilityName||'your facility')+' from the inspection on '+(r.date||usDate(r.day))+'.'+
+      (fix?' Please send photo documentation of the completed corrections to '+photoTo()+' within '+(r.photoDays||S.settings.photoDays||'30')+' days.':'')+
+      '\n\nThank you,\n'+(S.settings.inspector||r.inspector||'')}}
+async function emailPdf(btnId){
+  const id=view.id,r=S.items[id],b=$('#'+btnId),label=b.innerHTML;
+  const to=(r.email||'').trim();
+  if(to&&navigator.clipboard)navigator.clipboard.writeText(to).catch(()=>{});
+  b.disabled=true;b.innerHTML='<span class="spin"></span> Making PDF…';
+  try{
+    const file=await getPdf(id),m=mailText(r);
+    if(canShare([file])){
+      const how=await shareOrSave([file],m);
+      if(how==='shared')toast(to?'Sent to the share sheet. '+to+' was copied.':'Sent to the share sheet');
+    }else{
+      download(file);
+      location.href='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(m.title)+'&body='+encodeURIComponent(m.text+'\n\n(Attach '+file.name+' from your Downloads.)');
+    }
+  }catch(e){
+    toast(e&&e.name==='NotAllowedError'?'Tap Email Report again to open Mail.':'Could not make the PDF'+(e&&e.message?': '+e.message:''));
+  }finally{b.disabled=false;b.innerHTML=label}
+}
+/* Day exports make their files on the first tap, then the button opens the share sheet on the second tap. */
+const prepared={};
+async function prepDay(kind){
+  const btn=$(kind==='zip'?'#expZip':'#expEach'),label=btn.innerHTML,day=view.day,list=exportList();
+  const have=prepared[kind];
+  if(have&&have.day===day&&have.stamp===list.map(v=>v.updatedAt||0).join()){
+    try{const how=await shareOrSave(have.files,have.meta);if(how==='saved')toast('Saved '+have.files.length+' file'+(have.files.length>1?'s':''))}
+    catch(e){toast('Could not open the share sheet. Tap again.')}
+    return}
+  btn.disabled=true;
+  try{
+    const files=[],used={};
+    for(let i=0;i<list.length;i++){btn.textContent='Making PDF '+(i+1)+' of '+list.length+'…';
+      let n=fileName(list[i]);if(used[n]){used[n]++;n=n.replace(/\.pdf$/,' ('+used[n]+').pdf')}else used[n]=1;
+      files.push(asFile(await pdfFor(list[i]),n))}
+    const base='BRP Reports '+usDate(day).split('/').map(x=>String(+x)).join('-');
+    let out=files;
+    if(kind==='zip'){btn.textContent='Zipping…';const zip=new JSZip();files.forEach(f=>zip.file(f.name,f));out=[asFile(await zip.generateAsync({type:'blob'}),base+'.zip','application/zip')]}
+    prepared[kind]={day,stamp:list.map(v=>v.updatedAt||0).join(),files:out,meta:{title:base}};
+    btn.innerHTML=`<span class="main"><span class="ttl">${kind==='zip'?'Ready: tap to save the ZIP':'Ready: tap to email or share'}</span></span><span class="det">${out.length} file${out.length>1?'s':''}</span>`;
+  }catch(e){btn.innerHTML=label;toast('Could not make the PDFs'+(e&&e.message?': '+e.message:''))}
+  finally{btn.disabled=false}
+}
+const exportZip=()=>prepDay('zip'),exportEach=()=>prepDay('each');
+async function makePdf(btnId){
+  const id=view.id,b=$('#'+btnId),label=b.innerHTML;b.disabled=true;
+  try{const file=await getPdf(id);const how=await shareOrSave([file]);if(how==='saved')toast('PDF saved: '+file.name)}
+  catch(e){toast(e&&e.name==='NotAllowedError'?'Tap again to open the PDF.':'Could not make the PDF'+(e&&e.message?': '+e.message:''))}
+  finally{b.disabled=false;b.innerHTML=label}
+}
+
+/* ---------- backup ---------- */
+async function saveBackup(){
+  const d=todayISO(),name='Field Book backup '+d+'.json';
+  const file=asFile(JSON.stringify({app:'brp-field-book',version:1,savedAt:new Date().toISOString(),settings:S.settings,items:S.items},null,1),name,'application/json');
+  try{const how=await shareOrSave([file],{title:name});if(how!=='cancelled')toast('Backup ready: '+Object.keys(S.items).length+' inspections')}
+  catch(e){toast('Could not save the backup')}
+}
+async function loadBackup(input){
+  const f=input.files&&input.files[0];input.value='';if(!f)return;
+  try{
+    const j=JSON.parse(await f.text());if(!j||typeof j.items!=='object')throw new Error('not a Field Book backup');
+    let added=0,updated=0;
+    Object.entries(j.items).forEach(([id,v])=>{if(!v||v.kind!=='inspection')return;const cur=S.items[id];
+      if(!cur){S.items[id]=v;added++}else if((v.updatedAt||0)>(cur.updatedAt||0)){S.items[id]=v;updated++}});
+    Object.entries(j.settings||{}).forEach(([k,v])=>{if(v&&!S.settings[k])S.settings[k]=v});
+    localSave();render();toast(`Loaded: ${added} new, ${updated} updated`);
+  }catch(e){toast('That file is not a Field Book backup')}
+}
+
+boot();
+if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+
+</body></html>
