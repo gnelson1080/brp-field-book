@@ -507,7 +507,7 @@ function dayHTML(){
   ${view.edit?grp('',view.confirm==='day:'+view.day?confirmRow('day:'+view.day,`Delete this whole day and its ${items.length} inspection${items.length===1?'':'s'}? This can’t be undone.`,'Delete Day'):`<button class="cell danger" data-ask="day:${view.day}">Delete This Day</button>`):''}
   ${items.length&&!view.edit?grp('Export for QC',`<button class="cell accent" id="expEach"><span class="main"><span class="ttl">Email or Share All PDFs</span></span><span class="det">${items.length} PDF${items.length>1?'s':''}</span></button>
     <button class="cell accent" id="expZip"><span class="main"><span class="ttl">Save All as ZIP</span></span></button>`,
-    'Each report is its own PDF, named like “BRP21055544 - Burlington Distribution Corp. 9-16-2026”.'):''}
+    'Each report is its own PDF, named like “BRP00000000 - Sample Business 1-2-2026”.'):''}
   </div>`;
 }
 
@@ -533,14 +533,14 @@ function inspHTML(){
 function typical(group,label){return grp('',`<button class="cell accent" data-typical="${group}"><span class="main"><span class="ttl">Fill Typical Answers</span></span></button>`,label)}
 
 const STEP_HTML={
-  notes:r=>`${grp('Your notes',`<label class="cell-x field"><span>Type or dictate. Shorthand is fine.</span><textarea id="f_notes" data-t="notes" style="min-height:190px" placeholder="del taco van buren BRP22147366 BRPC044151 met diana mgr. fluid stains drive thru aisle, trash lids open, no spill kit, BR expired. 45 days">${esc(r.notes)}</textarea></label>`,
+  notes:r=>`${grp('Your notes',`<label class="cell-x field"><span>Type or dictate. Shorthand is fine.</span><textarea id="f_notes" data-t="notes" style="min-height:190px" placeholder="sample market BRP00000000 BRPC000000 met sam mgr. fluid stains drive thru aisle, trash lids open, no spill kit, BR expired. 45 days">${esc(r.notes)}</textarea></label>`,
       'Your own notes while you walk the site. They are not printed on the form. Tap the microphone on the keyboard to talk instead of type.')}
     ${grp('',`<button class="cell accent" id="skipNotes"><span class="main"><span class="ttl">Start the form</span></span>${IC.chev}</button>`)}`,
   facility:r=>`${grp('Printed on the form',`<div class="row2">${field('facilityId','Facility ID',r.facilityId,'text','autocomplete="off" autocapitalize="characters" placeholder="BRPC…"')}${field('inspectionId','Inspection ID',r.inspectionId,'text','autocomplete="off" autocapitalize="characters" placeholder="BRP…"')}</div>
       ${field('facilityName','Facility Name',r.facilityName,'text','placeholder="Business name"')}
       <div class="row2">${field('date','Inspection Date',r.date)}${field('inspector','Inspector',r.inspector)}</div>
       ${field('email','E-Mail Report',r.email,'email','autocomplete="off" autocapitalize="none" placeholder="Business email"')}`)}
-    ${grp('Walked the site with',`<div class="row2">${field('contactName','Name',r.contactName,'text','autocomplete="off" placeholder="Diana"')}${field('contactTitle','Title',r.contactTitle,'text','list="titleList" autocomplete="off" placeholder="Manager"')}</div>
+    ${grp('Walked the site with',`<div class="row2">${field('contactName','Name',r.contactName,'text','autocomplete="off" placeholder="Sam"')}${field('contactTitle','Title',r.contactTitle,'text','list="titleList" autocomplete="off" placeholder="Manager"')}</div>
       <datalist id="titleList">${['Manager','General Manager','Owner','Facilities Supervisor','Maintenance Technician','Production Manager'].map(t=>`<option value="${t}">`).join('')}</datalist>`,'Not printed. Used to write your comments.')}`,
   check:r=>`${typical('check','Fills only the blanks, with the usual answers for a commercial site.')}
     ${grp('Checklist items',CHECK.map(([k,l])=>`<div class="cell qrow"><span>${l}</span>${seg(k,r[k])}</div>`).join(''))}`,
@@ -708,7 +708,7 @@ function bind(){
 
 /* ---------- PDF ---------- */
 let template=null;
-// Filed as: "BRP21055544 - Burlington Distribution Corp. 9-16-2026.pdf"
+// Filed as: "BRP00000000 - Sample Business 1-2-2026.pdf"
 function fileName(r){
   const d=(r.date||usDate(r.day)).trim().split(/[\/.-]/).map(x=>/^\d+$/.test(x)?String(+x):x).join('-');
   return [(r.inspectionId||r.facilityId||'Inspection').trim(),'-',(r.facilityName||'').trim(),d].filter(Boolean).join(' ').replace(/[\\/:*?"<>|]+/g,'').replace(/\s+/g,' ')+'.pdf'}
