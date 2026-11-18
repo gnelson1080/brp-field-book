@@ -319,11 +319,11 @@ function templates(r){const days=r.photoDays||S.settings.photoDays||'30',who=con
 function hasCorrections(r){return BMPQ.some(([k])=>r[k]==='No')||(r.compliance&&r.compliance!==COMPLIANCE[0])}
 
 /* ---------- storage: on this device (home-screen apps keep it; Backup moves it between devices) ---------- */
-const S={items:{},settings:{inspector:'',email:'',phone:'',photoDays:'30'}};
+const S={items:{},days:{},settings:{inspector:'',email:'',phone:'',photoDays:'30'}};
 const LKEY='brp-fieldbook-v1';
-function localLoad(){try{const j=JSON.parse(localStorage.getItem(LKEY)||'{}');S.items=j.items||{};S.settings={...S.settings,...(j.settings||{})}}catch(e){}}
+function localLoad(){try{const j=JSON.parse(localStorage.getItem(LKEY)||'{}');S.items=j.items||{};S.days=j.days||{};S.settings={...S.settings,...(j.settings||{})}}catch(e){}}
 let saveErr=false;
-function localSave(){try{localStorage.setItem(LKEY,JSON.stringify({items:S.items,settings:S.settings}));saveErr=false}catch(e){saveErr=true}}
+function localSave(){try{localStorage.setItem(LKEY,JSON.stringify({items:S.items,days:S.days,settings:S.settings}));saveErr=false}catch(e){saveErr=true}}
 function boot(){
   localLoad();render();
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
@@ -480,6 +480,8 @@ function homeHTML(){
   ${list.length?grpX('Field days',editBtn(),list.map(d=>view.confirm==='day:'+d?confirmRow('day:'+d,`Delete ${esc(medDate(d))} and its ${days[d]} inspection${days[d]>1?'s':''}? This can’t be undone.`,'Delete Day'):
       `<button class="cell" ${view.edit?`data-ask="day:${d}"`:`data-day="${d}"`}>${view.edit?'<span class="minus">−</span>':''}<span class="main"><span class="ttl">${esc(medDate(d))}</span><span class="sub">${days[d]} inspection${days[d]>1?'s':''}</span></span><span class="det ${done[d]===days[d]?'st-done':''}">${done[d]||0} of ${days[d]} done</span>${view.edit?'':IC.chev}</button>`).join(''),view.edit?'Tap a day to delete it and all of its inspections.':''):
     grp('Field days',`<div class="cell"><span class="sub" style="font-size:15px;white-space:normal">Pick a date above and tap Add. Each day holds that day’s inspections.</span></div>`)}
+  ${mileDays().length?grp('Mileage log',mileDays().slice(-5).reverse().map(d=>{const m=S.days[d];return `<div class="cell"><span class="main"><span class="ttl">${esc(medDate(d))}</span><span class="sub">${esc(m.start||'?')} to ${esc(m.end||'?')}</span></span><span class="det">${miLabel(dayMiles(d))}</span></div>`}).join('')+`<button class="cell accent" id="mileShare"><span class="main"><span class="ttl">Share Mileage Log (CSV)</span></span></button>`,
+    'Total so far: '+miLabel(mileDays().reduce((a,d)=>a+(dayMiles(d)||0),0))+'. Showing the last 5 days; the CSV has them all.'):''}
   ${grp('Add a route',`<label class="cell-x field"><span>Paste rows from the database, or one line per stop</span><textarea id="routeText" style="min-height:96px" placeholder="BRP21221067 | BRPC190424 | 12520 Magnolia Ave Unit A">${esc(view.routeDraft||'')}</textarea></label>
     <button class="cell accent" id="routeGo"><span class="main"><span class="ttl">Add to ${esc(shortDate(view.day))}</span></span></button>`,
     'Each line becomes an inspection with the BRP and BRPC filled in. A line like “Day: 2026-11-19” picks the day. Lines already on that day are skipped.')}
@@ -504,6 +506,9 @@ function dayHTML(){
   <div class="body">
   <h1 class="big">${esc(medDate(view.day))}</h1>
   <p class="bigsub">${items.length?`${done} of ${items.length} done`:'No inspections yet'}</p>
+  ${grp('Mileage',`<div class="row2">${field('m_start','Start odometer',(S.days[view.day]||{}).start||'','text','inputmode="decimal" autocomplete="off" placeholder="Before the first stop" data-m="start"')}${field('m_end','End odometer',(S.days[view.day]||{}).end||'','text','inputmode="decimal" autocomplete="off" placeholder="End of day" data-m="end"')}</div>
+    <div class="cell"><span class="main"><span class="ttl">Miles today</span></span><span class="det" id="mTotal">${miLabel(dayMiles(view.day))}</span></div>`,
+    (S.days[view.day]||{}).start?'':'Enter your odometer reading before you leave for the first stop.')}
   ${grpX('Inspections',items.length?editBtn():'',`${items.map(([id,v],i)=>view.confirm==='insp:'+id?confirmRow('insp:'+id,`Delete ${esc(v.facilityName||'this inspection')}? This can’t be undone.`,'Delete'):
       view.edit?`<button class="cell" data-ask="insp:${id}"><span class="minus">−</span><span class="main"><span class="ttl">${esc(v.facilityName||v.address||'Untitled inspection')}</span><span class="sub"><span class="mono">${esc(v.inspectionId||'No BRP number')}</span></span></span>${statusText(v)}</button>`:stopRow(id,v,i+1)).join('')}
     ${view.edit?'':`<button class="cell accent" id="addInsp">${IC.plus}<span class="main"><span class="ttl">Add Inspection</span></span></button>`}`)}
@@ -623,15 +628,19 @@ function bind(){
     on('routeText','input',e=>{view.routeDraft=e.target.value});
     on('routeGo','click',()=>{const r=importRoute($('#routeText').value);if(!r)return;view.routeDraft='';
       toast(r.added?`Added ${r.added} inspection${r.added>1?'s':''}`+(r.skipped?` (${r.skipped} already there)`:''):'Those are already on that day');go('day',{day:r.day})});
+    on('mileShare','click',shareMileage);
     on('bkSave','click',saveBackup);on('bkFile','change',e=>loadBackup(e.target));
     return;
   }
   if(view.name==='day'){
     on('back','click',()=>goBack('home'));
     on('newDay','click',()=>{goBack('home');const d=$('#dayPick');if(d){d.focus();try{d.showPicker()}catch(e){}}});
-    on('addInsp','click',()=>{const id=newId();
+    on('addInsp','click',()=>{const id=newId();if(!(S.days[view.day]||{}).start)toast('Tip: add your start odometer on the day screen');
       S.items[id]={kind:'inspection',day:view.day,order:Date.now(),status:'draft',date:usDate(view.day),inspector:S.settings.inspector||'',createdAt:Date.now()};
       touch(id);go('insp',{id,step:0})});
+    document.querySelectorAll('[data-m]').forEach(el=>el.addEventListener('input',()=>{
+      const d=S.days[view.day]||(S.days[view.day]={});d[el.dataset.m]=el.value.trim();localSave();
+      const t=$('#mTotal');if(t)t.textContent=miLabel(dayMiles(view.day))}));
     on('expZip','click',exportZip);on('expEach','click',exportEach);
     return;
   }
@@ -786,6 +795,18 @@ async function makePdf(btnId){
   finally{b.disabled=false;b.innerHTML=label}
 }
 
+/* ---------- mileage: odometer at the start (and end) of each field day ---------- */
+const num=x=>parseFloat(String(x||'').replace(/,/g,''));
+function dayMiles(d){const m=S.days[d]||{},a=num(m.start),b=num(m.end);return isFinite(a)&&isFinite(b)&&b>=a?Math.round((b-a)*10)/10:null}
+const miLabel=v=>v==null?'—':v.toLocaleString(undefined,{maximumFractionDigits:1})+' mi';
+function mileDays(){return Object.keys(S.days).filter(d=>S.days[d]&&(S.days[d].start||S.days[d].end)).sort()}
+async function shareMileage(){
+  const rows=[['Date','Start odometer','End odometer','Miles']].concat(mileDays().map(d=>{const m=S.days[d];return [usDate(d),m.start||'',m.end||'',dayMiles(d)??'']}));
+  const name='Mileage log '+todayISO()+'.csv';
+  try{const how=await shareOrSave([asFile(rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'),name,'text/csv')],{title:name});if(how==='saved')toast('Saved '+name)}
+  catch(e){toast('Could not share the mileage log')}
+}
+
 /* ---------- add a route: pasted rows become inspections ---------- */
 function isoDay(t){if(/^\d{4}-\d{2}-\d{2}$/.test(t))return t;const [m,d,y]=t.split('/');return y+'-'+m.padStart(2,'0')+'-'+d.padStart(2,'0')}
 function nice(a){const L=a.replace(/[^A-Za-z]/g,'');return L&&L.replace(/[^A-Z]/g,'').length/L.length>=0.8?a.toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase()).replace(/\b(Ca|Rd|Dr|St|Ave|Blvd|Ln|Ct|Cir|Pkwy|Ter)\b/g,m=>m):a}
@@ -820,7 +841,7 @@ function importRoute(text){
 /* ---------- backup ---------- */
 async function saveBackup(){
   const d=todayISO(),name='Field Book backup '+d+'.json';
-  const file=asFile(JSON.stringify({app:'brp-field-book',version:1,savedAt:new Date().toISOString(),settings:S.settings,items:S.items},null,1),name,'application/json');
+  const file=asFile(JSON.stringify({app:'brp-field-book',version:1,savedAt:new Date().toISOString(),settings:S.settings,items:S.items,days:S.days},null,1),name,'application/json');
   try{const how=await shareOrSave([file],{title:name});if(how!=='cancelled')toast('Backup ready: '+Object.keys(S.items).length+' inspections')}
   catch(e){toast('Could not save the backup')}
 }
@@ -831,6 +852,7 @@ async function loadBackup(input){
     let added=0,updated=0;
     Object.entries(j.items).forEach(([id,v])=>{if(!v||v.kind!=='inspection')return;const cur=S.items[id];
       if(!cur){S.items[id]=v;added++}else if((v.updatedAt||0)>(cur.updatedAt||0)){S.items[id]=v;updated++}});
+    Object.entries(j.days||{}).forEach(([d,v])=>{if(!v)return;const c=S.days[d]||(S.days[d]={});if(!c.start&&v.start)c.start=v.start;if(!c.end&&v.end)c.end=v.end});
     Object.entries(j.settings||{}).forEach(([k,v])=>{if(v&&!S.settings[k])S.settings[k]=v});
     localSave();render();toast(`Loaded: ${added} new, ${updated} updated`);
   }catch(e){toast('That file is not a Field Book backup')}
