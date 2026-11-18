@@ -1,5 +1,5 @@
 /* Keeps the Field Book working with no signal. Bump VERSION whenever any file changes. */
-const VERSION = 'fieldbook-v2';
+const VERSION = 'fieldbook-v3';
 const FILES = ['./', 'index.html', 'fill.js', 'brp-form.pdf', 'vendor/pdf-lib.min.js', 'vendor/jszip.min.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

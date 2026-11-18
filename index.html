@@ -480,6 +480,9 @@ function homeHTML(){
   ${list.length?grpX('Field days',editBtn(),list.map(d=>view.confirm==='day:'+d?confirmRow('day:'+d,`Delete ${esc(medDate(d))} and its ${days[d]} inspection${days[d]>1?'s':''}? This can’t be undone.`,'Delete Day'):
       `<button class="cell" ${view.edit?`data-ask="day:${d}"`:`data-day="${d}"`}>${view.edit?'<span class="minus">−</span>':''}<span class="main"><span class="ttl">${esc(medDate(d))}</span><span class="sub">${days[d]} inspection${days[d]>1?'s':''}</span></span><span class="det ${done[d]===days[d]?'st-done':''}">${done[d]||0} of ${days[d]} done</span>${view.edit?'':IC.chev}</button>`).join(''),view.edit?'Tap a day to delete it and all of its inspections.':''):
     grp('Field days',`<div class="cell"><span class="sub" style="font-size:15px;white-space:normal">Pick a date above and tap Add. Each day holds that day’s inspections.</span></div>`)}
+  ${grp('Add a route',`<label class="cell-x field"><span>Paste rows from the database, or one line per stop</span><textarea id="routeText" style="min-height:96px" placeholder="BRP21221067 | BRPC190424 | 12520 Magnolia Ave Unit A">${esc(view.routeDraft||'')}</textarea></label>
+    <button class="cell accent" id="routeGo"><span class="main"><span class="ttl">Add to ${esc(shortDate(view.day))}</span></span></button>`,
+    'Each line becomes an inspection with the BRP and BRPC filled in. A line like “Day: 2026-11-19” picks the day. Lines already on that day are skipped.')}
   ${grp('Your details',`${field('s_name','Inspector name',S.settings.inspector,'text','autocomplete="name" data-s="inspector"')}
     ${field('s_email','Email for photo documentation',S.settings.email||'','email','autocomplete="email" autocapitalize="none" data-s="email"')}
     ${field('s_phone','Cell for photos by text (optional)',S.settings.phone||'','text','inputmode="tel" autocomplete="tel" data-s="phone"')}`,
@@ -492,7 +495,7 @@ function homeHTML(){
 
 function statusText(v){return v.status==='done'?'<span class="det st-done">Done</span>':flagged(v)?'<span class="det st-fix">Corrections</span>':'<span class="det st-open">Open</span>'}
 function stopRow(id,v,n,showDay){
-  return `<button class="cell" data-open="${id}"><span class="badge ${v.status==='done'?'done':''} ${view.justDone===id?'pop':''}">${v.status==='done'?IC.check:(n??'·')}</span><span class="main"><span class="ttl">${esc(v.facilityName||'Untitled inspection')}</span><span class="sub"><span class="mono">${esc(v.inspectionId||'No BRP number')}</span>${showDay?' · '+esc(usDate(v.day)):''}</span></span>${statusText(v)}${IC.chev}</button>`;
+  return `<button class="cell" data-open="${id}"><span class="badge ${v.status==='done'?'done':''} ${view.justDone===id?'pop':''}">${v.status==='done'?IC.check:(n??'·')}</span><span class="main"><span class="ttl">${esc(v.facilityName||v.address||'Untitled inspection')}</span><span class="sub"><span class="mono">${esc(v.inspectionId||'No BRP number')}</span>${showDay?' · '+esc(usDate(v.day)):''}</span></span>${statusText(v)}${IC.chev}</button>`;
 }
 
 function dayHTML(){
@@ -502,7 +505,7 @@ function dayHTML(){
   <h1 class="big">${esc(medDate(view.day))}</h1>
   <p class="bigsub">${items.length?`${done} of ${items.length} done`:'No inspections yet'}</p>
   ${grpX('Inspections',items.length?editBtn():'',`${items.map(([id,v],i)=>view.confirm==='insp:'+id?confirmRow('insp:'+id,`Delete ${esc(v.facilityName||'this inspection')}? This can’t be undone.`,'Delete'):
-      view.edit?`<button class="cell" data-ask="insp:${id}"><span class="minus">−</span><span class="main"><span class="ttl">${esc(v.facilityName||'Untitled inspection')}</span><span class="sub"><span class="mono">${esc(v.inspectionId||'No BRP number')}</span></span></span>${statusText(v)}</button>`:stopRow(id,v,i+1)).join('')}
+      view.edit?`<button class="cell" data-ask="insp:${id}"><span class="minus">−</span><span class="main"><span class="ttl">${esc(v.facilityName||v.address||'Untitled inspection')}</span><span class="sub"><span class="mono">${esc(v.inspectionId||'No BRP number')}</span></span></span>${statusText(v)}</button>`:stopRow(id,v,i+1)).join('')}
     ${view.edit?'':`<button class="cell accent" id="addInsp">${IC.plus}<span class="main"><span class="ttl">Add Inspection</span></span></button>`}`)}
   ${view.edit?grp('',view.confirm==='day:'+view.day?confirmRow('day:'+view.day,`Delete this whole day and its ${items.length} inspection${items.length===1?'':'s'}? This can’t be undone.`,'Delete Day'):`<button class="cell danger" data-ask="day:${view.day}">Delete This Day</button>`):''}
   ${items.length&&!view.edit?grp('Export for QC',`<button class="cell accent" id="expEach"><span class="main"><span class="ttl">Email or Share All PDFs</span></span><span class="det">${items.length} PDF${items.length>1?'s':''}</span></button>
@@ -515,11 +518,11 @@ function inspHTML(){
   const r=S.items[view.id];if(!r){view.name='day';return dayHTML()}
   const i=view.step,s=STEPS[i],last=STEPS.length-1;
   const prog=`<div class="prog" aria-hidden="true">${STEPS.map((x,j)=>{const p=x.keys.length?stepCount(r,x)/x.keys.length:(j<=i?1:0);return `<i class="${j===i?'cur':''}" style="--p:${p}"></i>`}).join('')}</div>`;
-  return `${nav(`<button class="navbtn" id="back">${IC.back}Day</button>`,r.facilityName||'New Inspection',`<button class="navbtn" id="openSteps">Steps</button>`)}
+  return `${nav(`<button class="navbtn" id="back">${IC.back}Day</button>`,r.facilityName||r.address||'New Inspection',`<button class="navbtn" id="openSteps">Steps</button>`)}
   ${prog}
   <div class="body">
   <h1 class="big">${esc(s.name)}</h1>
-  <p class="bigsub">${esc(r.facilityName||'New inspection')}${s.keys.length?` · <span id="stepCount">${stepCount(r,s)} of ${s.keys.length}</span>`:''} · <span id="saveLbl" class="save"></span></p>
+  <p class="bigsub">${esc(r.facilityName||r.address||'New inspection')}${s.keys.length?` · <span id="stepCount">${stepCount(r,s)} of ${s.keys.length}</span>`:''} · <span id="saveLbl" class="save"></span></p>
   ${STEP_HTML[s.id](r)}
   </div>
   ${chkBar(r)}
@@ -537,7 +540,7 @@ const STEP_HTML={
       'Your own notes while you walk the site. They are not printed on the form. Tap the microphone on the keyboard to talk instead of type.')}
     ${grp('',`<button class="cell accent" id="skipNotes"><span class="main"><span class="ttl">Start the form</span></span>${IC.chev}</button>`)}`,
   facility:r=>`${grp('Printed on the form',`<div class="row2">${field('facilityId','Facility ID',r.facilityId,'text','autocomplete="off" autocapitalize="characters" placeholder="BRPC…"')}${field('inspectionId','Inspection ID',r.inspectionId,'text','autocomplete="off" autocapitalize="characters" placeholder="BRP…"')}</div>
-      ${field('facilityName','Facility Name',r.facilityName,'text','placeholder="Business name"')}
+      ${field('facilityName','Facility Name',r.facilityName,'text','placeholder="'+esc(r.address||'Business name')+'"')}
       <div class="row2">${field('date','Inspection Date',r.date)}${field('inspector','Inspector',r.inspector)}</div>
       ${field('email','E-Mail Report',r.email,'email','autocomplete="off" autocapitalize="none" placeholder="Business email"')}`)}
     ${grp('Walked the site with',`<div class="row2">${field('contactName','Name',r.contactName,'text','autocomplete="off" placeholder="Sam"')}${field('contactTitle','Title',r.contactTitle,'text','list="titleList" autocomplete="off" placeholder="Manager"')}</div>
@@ -617,6 +620,9 @@ function bind(){
     on('find','input',e=>{view.q=e.target.value;const pos=e.target.selectionStart;rerender();const f=$('#find');f.focus();f.setSelectionRange(pos,pos)});
     document.querySelectorAll('[data-s]').forEach(el=>el.addEventListener('change',()=>{S.settings[el.dataset.s]=el.value.trim();saveSettings()}));
     document.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>go('day',{day:b.dataset.day}));
+    on('routeText','input',e=>{view.routeDraft=e.target.value});
+    on('routeGo','click',()=>{const r=importRoute($('#routeText').value);if(!r)return;view.routeDraft='';
+      toast(r.added?`Added ${r.added} inspection${r.added>1?'s':''}`+(r.skipped?` (${r.skipped} already there)`:''):'Those are already on that day');go('day',{day:r.day})});
     on('bkSave','click',saveBackup);on('bkFile','change',e=>loadBackup(e.target));
     return;
   }
@@ -778,6 +784,36 @@ async function makePdf(btnId){
   try{const file=await getPdf(id);const how=await shareOrSave([file]);if(how==='saved')toast('PDF saved: '+file.name)}
   catch(e){toast(e&&e.name==='NotAllowedError'?'Tap again to open the PDF.':'Could not make the PDF'+(e&&e.message?': '+e.message:''))}
   finally{b.disabled=false;b.innerHTML=label}
+}
+
+/* ---------- add a route: pasted rows become inspections ---------- */
+function isoDay(t){if(/^\d{4}-\d{2}-\d{2}$/.test(t))return t;const [m,d,y]=t.split('/');return y+'-'+m.padStart(2,'0')+'-'+d.padStart(2,'0')}
+function nice(a){const L=a.replace(/[^A-Za-z]/g,'');return L&&L.replace(/[^A-Z]/g,'').length/L.length>=0.8?a.toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase()).replace(/\b(Ca|Rd|Dr|St|Ave|Blvd|Ln|Ct|Cir|Pkwy|Ter)\b/g,m=>m):a}
+function parseRoute(text){
+  const items=[];let day=null;
+  String(text).split(/\r?\n/).forEach(line=>{
+    const t=line.trim();if(!t)return;
+    const d=t.match(/^day\s*[:=]\s*(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if(d){day=isoDay(d[1]);return}
+    const brp=(t.match(/\bBRP\d{6,}\b/)||[])[0];if(!brp)return;
+    const brpc=(t.match(/\bBRPC\d[\w-]*/)||[])[0]||'';
+    const parts=t.split(/\t|\s*\|\s*/).map(x=>x.trim()).filter(Boolean);
+    const cand=parts.find(p=>/^\d+\s+\S/.test(p));
+    const addr=cand?nice(cand.replace(/\s+Riverside\b.*$/i,'').replace(/\s+/g,' ').trim()):'';
+    items.push({brp,brpc,addr});
+  });
+  return {day,items}
+}
+function importRoute(text){
+  const {day:d,items}=parseRoute(text);
+  if(!items.length){toast('No BRP numbers found. Each line needs one, like BRP21221067.');return 0}
+  const day=d||view.day;let added=0,skipped=0;
+  items.forEach((it,i)=>{
+    if(Object.values(S.items).some(v=>v.day===day&&v.inspectionId===it.brp)){skipped++;return}
+    S.items[newId()]={kind:'inspection',day,order:Date.now()+i,status:'draft',date:usDate(day),inspector:S.settings.inspector||'',facilityId:it.brpc,inspectionId:it.brp,address:it.addr,createdAt:Date.now()};
+    added++});
+  localSave();view.day=day;
+  return {added,skipped,day}
 }
 
 /* ---------- backup ---------- */
