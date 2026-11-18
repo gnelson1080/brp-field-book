@@ -790,19 +790,20 @@ async function makePdf(btnId){
 function isoDay(t){if(/^\d{4}-\d{2}-\d{2}$/.test(t))return t;const [m,d,y]=t.split('/');return y+'-'+m.padStart(2,'0')+'-'+d.padStart(2,'0')}
 function nice(a){const L=a.replace(/[^A-Za-z]/g,'');return L&&L.replace(/[^A-Z]/g,'').length/L.length>=0.8?a.toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase()).replace(/\b(Ca|Rd|Dr|St|Ave|Blvd|Ln|Ct|Cir|Pkwy|Ter)\b/g,m=>m):a}
 function parseRoute(text){
-  const items=[];let day=null;
-  String(text).split(/\r?\n/).forEach(line=>{
-    const t=line.trim();if(!t)return;
-    const d=t.match(/^day\s*[:=]\s*(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/i);
-    if(d){day=isoDay(d[1]);return}
-    const brp=(t.match(/\bBRP\d{6,}\b/)||[])[0];if(!brp)return;
-    const brpc=(t.match(/\bBRPC\d[\w-]*/)||[])[0]||'';
-    const parts=t.split(/\t|\s*\|\s*/).map(x=>x.trim()).filter(Boolean);
-    const cand=parts.find(p=>/^\d+\s+\S/.test(p));
+  const t=String(text).replace(/ /g,' ');
+  const dm=t.match(/day\s*[:=]\s*(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/i);
+  const items=[];
+  /* Each BRP number starts a new stop, so it works even if the line breaks get lost in the copy. */
+  t.split(/(?=\bBRP\d{6,}\b)/).forEach(seg=>{
+    const brp=(seg.match(/^BRP\d{6,}\b/)||[])[0];if(!brp)return;
+    const brpc=(seg.match(/\bBRPC\d[\w-]*/)||[])[0]||'';
+    const parts=seg.split(/\t|\s*\|\s*|\r?\n/).map(x=>x.trim()).filter(Boolean);
+    let cand=parts.find(p=>/^\d+\s+\S/.test(p));
+    if(!cand){const m=seg.match(/\b(\d{2,6}\s+[A-Za-z][A-Za-z0-9 .'#:-]{2,60}?)(?=\s+Riverside\b|\s+BRPC|\s*$)/i);cand=m&&m[1]}
     const addr=cand?nice(cand.replace(/\s+Riverside\b.*$/i,'').replace(/\s+/g,' ').trim()):'';
     items.push({brp,brpc,addr});
   });
-  return {day,items}
+  return {day:dm?isoDay(dm[1]):null,items}
 }
 function importRoute(text){
   const {day:d,items}=parseRoute(text);
